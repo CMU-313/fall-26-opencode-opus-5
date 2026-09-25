@@ -38,6 +38,7 @@ export const Info = Schema.Struct({
   mode: Schema.Literals(["subagent", "primary", "all"]),
   native: Schema.optional(Schema.Boolean),
   hidden: Schema.optional(Schema.Boolean),
+  hintMode: Schema.optional(Schema.Boolean),
   topP: Schema.optional(Schema.Finite),
   temperature: Schema.optional(Schema.Finite),
   color: Schema.optional(Schema.String),
