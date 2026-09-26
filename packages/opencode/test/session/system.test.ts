@@ -43,6 +43,14 @@ const build: Agent.Info = {
   options: {},
 }
 
+const hintAgent: Agent.Info = {
+  name: "hint",
+  mode: "primary",
+  permission: Permission.fromConfig({ "*": "allow" }),
+  options: {},
+  hintMode: true,
+}
+
 const it = testEffect(
   LayerNode.compile(SystemPrompt.node, [
     [
@@ -144,6 +152,25 @@ describe("session.system", () => {
           "</mcp_instructions>",
         ].join("\n"),
       )
+    }),
+  )
+
+    it.effect("hint output includes hint-mode instructions when hintMode is enabled", () =>
+    Effect.gen(function* () {
+      const prompt = yield* SystemPrompt.Service
+      const output = yield* prompt.hint(hintAgent)
+
+      expect(output).toContain("<hint_mode>")
+      expect(output).toContain("Do not provide a complete solution immediately")
+    }),
+  )
+
+  it.effect("hint output is undefined when hintMode is not enabled", () =>
+    Effect.gen(function* () {
+      const prompt = yield* SystemPrompt.Service
+      const output = yield* prompt.hint(build)
+
+      expect(output).toBeUndefined()
     }),
   )
 })
