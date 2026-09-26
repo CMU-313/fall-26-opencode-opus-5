@@ -180,6 +180,24 @@ const layer = Layer.effect(
             mode: "primary",
             native: true,
           },
+          
+          hint: {
+            name: "hint",
+            description:
+              "Learning-focused agent for students. Provides incremental hints and guiding questions before giving a complete solution.",
+            options: {},
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                question: "allow",
+                plan_enter: "allow",
+              }),
+              user,
+            ),
+            mode: "primary",
+            native: true,
+            hintMode: true,
+          },
           general: {
             name: "general",
             description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
