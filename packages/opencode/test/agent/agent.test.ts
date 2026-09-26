@@ -50,6 +50,7 @@ it.instance("returns default native agents when no config", () =>
     const names = agents.map((a) => a.name)
     expect(names).toContain("build")
     expect(names).toContain("plan")
+    expect(names).toContain("hint")
     expect(names).toContain("general")
     expect(names).toContain("explore")
     expect(names).toContain("compaction")
@@ -66,6 +67,17 @@ it.instance("build agent has correct default properties", () =>
     expect(build?.native).toBe(true)
     expect(evalPerm(build, "edit")).toBe("allow")
     expect(evalPerm(build, "bash")).toBe("allow")
+  }),
+)
+
+it.instance("hint agent has correct default properties", () =>
+  Effect.gen(function* () {
+    const hint = yield* load((svc) => svc.get("hint"))
+    expect(hint).toBeDefined()
+    expect(hint?.mode).toBe("primary")
+    expect(hint?.native).toBe(true)
+    expect(hint?.hintMode).toBe(true)
+    expect(evalPerm(hint, "edit")).toBe("allow")
   }),
 )
 
@@ -749,6 +761,7 @@ it.instance(
       agent: {
         build: { disable: true },
         plan: { disable: true },
+        hint: { disable: true },
       },
     },
   },
