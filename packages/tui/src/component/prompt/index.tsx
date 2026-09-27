@@ -56,6 +56,7 @@ import { useTuiConfig } from "../../config"
 import { usePromptWorkspace } from "./workspace"
 import { usePromptMove } from "./move"
 import { readLocalAttachment } from "./local-attachment"
+import { parsePinCommand, runPinCommand } from "./pin"
 import { useLocation } from "../../context/location"
 
 registerOpencodeSpinner()
@@ -969,6 +970,26 @@ export function Prompt(props: PromptProps) {
     if (!selectedModel) {
       void promptModelWarning()
       return false
+    }
+
+    const pin = store.mode === "normal" ? parsePinCommand(store.prompt.input) : undefined
+    if (pin) {
+      const session = props.sessionID ? sync.session.get(props.sessionID) : undefined
+      if (!session) {
+        toast.show({ message: `Send a message first, then /${pin.action} files in the session`, variant: "error" })
+        return false
+      }
+      const provider = sync.data.provider.find((item) => item.id === selectedModel.providerID)
+      const result = await runPinCommand({
+        client: sdk.client,
+        session,
+        command: pin,
+        model: provider?.models[selectedModel.modelID],
+      })
+      toast.show({ message: result.message, variant: result.type })
+      if (result.type === "error") return false
+      clearPrompt()
+      return true
     }
 
     const workspaceSession = props.sessionID ? sync.session.get(props.sessionID) : undefined
