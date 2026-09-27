@@ -8,11 +8,47 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { PartID } from "./schema"
 import { MessageV2 } from "./message-v2"
 import { Session } from "./session"
+import { SessionPinned } from "./pinned"
 import PROMPT_PLAN from "./prompt/plan.txt"
 import BUILD_SWITCH from "./prompt/build-switch.txt"
 import PLAN_MODE from "./prompt/plan-mode.txt"
 
 export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
+  messages: SessionV1.WithParts[]
+  agent: Agent.Info
+  session: Session.Info
+  model?: { limit: { context: number } }
+}) {
+  yield* pinned(input)
+  return yield* modes(input)
+})
+
+// Pinned file contents are re-read and attached to the latest user message on every
+// step without being persisted, so they stay current and survive compaction.
+const pinned = Effect.fn("SessionReminders.pinned")(function* (input: {
+  messages: SessionV1.WithParts[]
+  session: Session.Info
+  model?: { limit: { context: number } }
+}) {
+  const sessions = yield* Session.Service
+  const current = yield* sessions.get(input.session.id).pipe(Effect.catch(() => Effect.succeed(input.session)))
+  const files = SessionPinned.list(current.metadata)
+  if (files.length === 0) return
+  const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
+  if (!userMessage) return
+  const ctx = yield* InstanceState.context
+  const loaded = yield* SessionPinned.load({ files, directory: ctx.directory })
+  userMessage.parts.push({
+    id: PartID.ascending(),
+    messageID: userMessage.info.id,
+    sessionID: userMessage.info.sessionID,
+    type: "text",
+    text: SessionPinned.render(loaded, SessionPinned.limit(input.model)),
+    synthetic: true,
+  })
+})
+
+const modes = Effect.fn("SessionReminders.modes")(function* (input: {
   messages: SessionV1.WithParts[]
   agent: Agent.Info
   session: Session.Info
