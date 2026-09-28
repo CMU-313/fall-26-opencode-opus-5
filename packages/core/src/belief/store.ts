@@ -8,6 +8,7 @@ import { FSUtil } from "../fs-util"
 import { Global } from "../global"
 import { Location } from "../location"
 import { BeliefSchema } from "./schema"
+import { BeliefStatus } from "./status"
 
 export type Target = "project" | "personal"
 
@@ -157,7 +158,7 @@ const layer = Layer.effect(
 
       const rejectedMatch = current.beliefs.find(
         (belief) =>
-          isRejected(belief) &&
+          BeliefStatus.derive(belief) === "rejected" &&
           normalizeStatement(belief.statement) === normalizedStatement &&
           sameTopics(belief.topics, normalizedTopics) &&
           scopesOverlap(belief.scope, scope),
@@ -288,25 +289,3 @@ function mergeVocabulary(vocabulary: ReadonlyArray<BeliefSchema.Topic>, topics: 
     .map((topic) => BeliefSchema.Topic.make(topic))
 }
 
-/**
- * Whether a belief currently reads as rejected: an owner rejection newer than
- * any owner assertion. Step 4 (`status.ts`) derives the full held/learned/
- * hypothesis/rejected status; this narrower check only needs the rejected
- * case, so it isn't duplicated as a dependency here.
- */
-function isRejected(belief: BeliefSchema.Belief) {
-  const latestRejection = latest(belief.rejections.map((rejection) => rejection.at))
-  if (!latestRejection) return false
-  const latestOwnerAssertion = latest(
-    belief.assertions.filter((assertion) => assertion.by === "owner").map((assertion) => assertion.at),
-  )
-  if (!latestOwnerAssertion) return true
-  return DateTime.isGreaterThan(latestRejection, latestOwnerAssertion)
-}
-
-function latest(dates: ReadonlyArray<DateTime.Utc>) {
-  return dates.reduce<DateTime.Utc | undefined>(
-    (max, date) => (!max || DateTime.isGreaterThan(date, max) ? date : max),
-    undefined,
-  )
-}
