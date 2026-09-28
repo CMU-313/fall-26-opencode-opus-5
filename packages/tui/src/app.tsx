@@ -86,6 +86,7 @@ import * as TuiAudio from "./audio"
 import { win32DisableProcessedInput, win32FlushInputBuffer } from "./terminal-win32"
 import { destroyRenderer } from "./util/renderer"
 import { cliErrorMessage, errorFormat } from "./util/error"
+import { DialogSessionMaxCost } from "./component/dialog-session-max-cost"
 
 registerOpencodeSpinner()
 
@@ -590,6 +591,18 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
             type: "home",
           })
           dialog.clear()
+        },
+      },
+      {
+        name: "session.max_cost",
+        title: "Set session spending limit",
+        category: "Session",
+        slashName: "maxcost",
+        enabled: () => route.data.type === "session",
+        run: () => {
+          if (route.data.type !== "session") return
+          const sessionID = route.data.sessionID
+          dialog.replace(() => <DialogSessionMaxCost sessionID={sessionID} />)
         },
       },
       {

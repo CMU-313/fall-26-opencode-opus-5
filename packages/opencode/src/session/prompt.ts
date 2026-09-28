@@ -1179,8 +1179,9 @@ const layer = Layer.effect(
           const maxSteps = agent.steps ?? Infinity
           const isLastStep = step >= maxSteps
 
-          const maxCost = agent.maxCost ?? Infinity
           const freshSession = yield* sessions.get(sessionID).pipe(Effect.orDie)
+          const override = freshSession.metadata?.maxCost
+          const maxCost = typeof override === "number" ? override : (agent.maxCost ?? Infinity)
           const isCostExceeded = (freshSession.cost ?? 0) >= maxCost
           if (isCostExceeded) {
             yield* Effect.logWarning("Session halted: spending cap reached", {
