@@ -36,6 +36,7 @@ const AgentSchema = Schema.StructWithRest(
     }),
     maxSteps: Schema.optional(PositiveInt).annotate({ description: "@deprecated Use 'steps' field instead." }),
     permission: Schema.optional(ConfigPermissionV1.Info),
+    maxCost: Schema.optional(Schema.Finite).annotate({ description: "Maximum USD cost for this agent's session before halting the next step."}),
   }),
   [Schema.Record(Schema.String, Schema.Any)],
 )
@@ -55,6 +56,7 @@ const KNOWN_KEYS = new Set([
   "maxSteps",
   "options",
   "permission",
+  "maxCost",
   "disable",
   "tools",
 ])
