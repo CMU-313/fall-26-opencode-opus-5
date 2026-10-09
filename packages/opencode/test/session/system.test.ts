@@ -9,6 +9,11 @@ import type { Provider } from "../../src/provider/provider"
 import { SystemPrompt } from "../../src/session/system"
 import { MCP } from "../../src/mcp"
 import { testEffect } from "../lib/effect"
+import { BeliefStore } from "@opencode-ai/core/belief/store"
+import { Location } from "@opencode-ai/core/location"
+import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { AbsolutePath } from "@opencode-ai/core/schema"
+import { InstanceState } from "../../src/effect/instance-state"
 
 const skills: Skill.Info[] = [
   {
@@ -41,6 +46,14 @@ const build: Agent.Info = {
   mode: "primary",
   permission: Permission.fromConfig({ "*": "allow" }),
   options: {},
+}
+
+const hintAgent: Agent.Info = {
+  name: "hint",
+  mode: "primary",
+  permission: Permission.fromConfig({ "*": "allow" }),
+  options: {},
+  hintMode: true,
 }
 
 const it = testEffect(
@@ -110,6 +123,29 @@ describe("session.system", () => {
     }),
   )
 
+  it.instance("beliefs output lists only beliefs the owner confirmed", () =>
+    Effect.gen(function* () {
+      const prompt = yield* SystemPrompt.Service
+      expect(yield* prompt.beliefs()).toBeUndefined()
+
+      yield* Effect.gen(function* () {
+        const store = yield* BeliefStore.Service
+        const assertion = { by: "agent", how: "assumed", ref: "msg_test" } as const
+        const held = yield* store.propose("project", { statement: "Prefer early returns", topics: ["control-flow"], assertion })
+        yield* store.propose("project", { statement: "Name booleans with is", topics: ["naming"], assertion })
+        if (held._tag === "added") yield* store.confirm("project", held.id, { ref: "msg_owner" })
+      }).pipe(
+        Effect.provide(LocationServiceMap.Service.get(Location.Ref.make({ directory: AbsolutePath.make(yield* InstanceState.directory) }))),
+        Effect.provide(locationServiceMapLayer),
+      )
+
+      const output = yield* prompt.beliefs()
+      expect(output).toContain("Project beliefs")
+      expect(output).toContain("[control-flow] Prefer early returns")
+      expect(output).not.toContain("Name booleans with is")
+    }),
+  )
+
   it.effect("MCP output includes connected server instructions", () =>
     Effect.gen(function* () {
       const prompt = yield* SystemPrompt.Service
@@ -144,6 +180,25 @@ describe("session.system", () => {
           "</mcp_instructions>",
         ].join("\n"),
       )
+    }),
+  )
+
+    it.effect("hint output includes hint-mode instructions when hintMode is enabled", () =>
+    Effect.gen(function* () {
+      const prompt = yield* SystemPrompt.Service
+      const output = yield* prompt.hint(hintAgent)
+
+      expect(output).toContain("<hint_mode>")
+      expect(output).toContain("Do not provide a complete solution immediately")
+    }),
+  )
+
+  it.effect("hint output is undefined when hintMode is not enabled", () =>
+    Effect.gen(function* () {
+      const prompt = yield* SystemPrompt.Service
+      const output = yield* prompt.hint(build)
+
+      expect(output).toBeUndefined()
     }),
   )
 })
