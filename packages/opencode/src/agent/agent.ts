@@ -38,6 +38,7 @@ export const Info = Schema.Struct({
   mode: Schema.Literals(["subagent", "primary", "all"]),
   native: Schema.optional(Schema.Boolean),
   hidden: Schema.optional(Schema.Boolean),
+  hintMode: Schema.optional(Schema.Boolean),
   topP: Schema.optional(Schema.Finite),
   temperature: Schema.optional(Schema.Finite),
   color: Schema.optional(Schema.String),
@@ -178,6 +179,24 @@ const layer = Layer.effect(
             ),
             mode: "primary",
             native: true,
+          },
+          
+          hint: {
+            name: "hint",
+            description:
+              "Learning-focused agent for students. Provides incremental hints and guiding questions before giving a complete solution.",
+            options: {},
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                question: "allow",
+                plan_enter: "allow",
+              }),
+              user,
+            ),
+            mode: "primary",
+            native: true,
+            hintMode: true,
           },
           general: {
             name: "general",
