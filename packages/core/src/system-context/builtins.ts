@@ -4,6 +4,7 @@ import { makeLocationNode } from "../effect/app-node"
 import { DateTime, Effect, Layer, Schema } from "effect"
 import { Location } from "../location"
 import { SystemContext } from "./index"
+import { BeliefContext } from "../belief-context"
 import { InstructionContext } from "../instruction-context"
 import { SystemContextRegistry } from "./registry"
 import { FSUtil } from "../fs-util"
@@ -46,5 +47,5 @@ const builtIns = Layer.effectDiscard(
 export const node = makeLocationNode({
   name: "system-context-builtins",
   layer: builtIns,
-  deps: [Location.node, SystemContextRegistry.node, InstructionContext.node, FSUtil.node, Global.node],
+  deps: [Location.node, SystemContextRegistry.node, InstructionContext.node, BeliefContext.node, FSUtil.node, Global.node],
 })
