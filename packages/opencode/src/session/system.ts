@@ -21,6 +21,8 @@ import { AbsolutePath } from "@opencode-ai/core/schema"
 import { Location } from "@opencode-ai/core/location"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
 import { Reference } from "@opencode-ai/core/reference"
+import { BeliefContext } from "@opencode-ai/core/belief-context"
+import { BeliefStore } from "@opencode-ai/core/belief/store"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 
@@ -45,6 +47,7 @@ export interface Interface {
   readonly environment: (model: Provider.Model) => Effect.Effect<string[]>
   readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
   readonly mcp: (agent: Agent.Info, permission?: PermissionV1.Ruleset) => Effect.Effect<string | undefined>
+  readonly beliefs: () => Effect.Effect<string | undefined>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SystemPrompt") {}
@@ -107,6 +110,18 @@ const layer = Layer.effect(
           // version of them here and a less verbose version in tool description, rather than vice versa.
           Skill.fmt(list, { verbose: true }),
         ].join("\n")
+      }),
+
+      beliefs: Effect.fn("SystemPrompt.beliefs")(function* () {
+        const ctx = yield* InstanceState.context
+        const store = yield* BeliefStore.Service.pipe(
+          Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))),
+        )
+        // Legacy sessions rebuild the system prompt every turn, so they render the full list rather than V2 diffs.
+        const lines = (yield* Effect.all([store.load("project"), store.load("personal")])).flatMap((loaded, index) =>
+          typeof loaded === "symbol" ? [] : BeliefContext.visibleLines(index === 0 ? "project" : "personal", loaded),
+        )
+        return lines.length === 0 ? undefined : BeliefContext.render(lines)
       }),
 
       mcp: Effect.fn("SystemPrompt.mcp")(function* (agent: Agent.Info, permission?: PermissionV1.Ruleset) {

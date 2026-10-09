@@ -109,6 +109,16 @@ describe("tool.registry", () => {
     }),
   )
 
+  it.instance("exposes the belief tool alongside the question tool", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const ids = yield* registry.ids()
+
+      expect(ids).toContain("question")
+      expect(ids).toContain("belief")
+    }),
+  )
+
   it.instance("does not expose execute unless code mode is enabled", () =>
     Effect.gen(function* () {
       const registry = yield* ToolRegistry.Service

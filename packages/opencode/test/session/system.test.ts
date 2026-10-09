@@ -9,6 +9,11 @@ import type { Provider } from "../../src/provider/provider"
 import { SystemPrompt } from "../../src/session/system"
 import { MCP } from "../../src/mcp"
 import { testEffect } from "../lib/effect"
+import { BeliefStore } from "@opencode-ai/core/belief/store"
+import { Location } from "@opencode-ai/core/location"
+import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { AbsolutePath } from "@opencode-ai/core/schema"
+import { InstanceState } from "../../src/effect/instance-state"
 
 const skills: Skill.Info[] = [
   {
@@ -107,6 +112,29 @@ describe("session.system", () => {
       expect(middle).toBeGreaterThan(alpha)
       expect(zeta).toBeGreaterThan(middle)
       expect(output).not.toContain("manual-skill")
+    }),
+  )
+
+  it.instance("beliefs output lists only beliefs the owner confirmed", () =>
+    Effect.gen(function* () {
+      const prompt = yield* SystemPrompt.Service
+      expect(yield* prompt.beliefs()).toBeUndefined()
+
+      yield* Effect.gen(function* () {
+        const store = yield* BeliefStore.Service
+        const assertion = { by: "agent", how: "assumed", ref: "msg_test" } as const
+        const held = yield* store.propose("project", { statement: "Prefer early returns", topics: ["control-flow"], assertion })
+        yield* store.propose("project", { statement: "Name booleans with is", topics: ["naming"], assertion })
+        if (held._tag === "added") yield* store.confirm("project", held.id, { ref: "msg_owner" })
+      }).pipe(
+        Effect.provide(LocationServiceMap.Service.get(Location.Ref.make({ directory: AbsolutePath.make(yield* InstanceState.directory) }))),
+        Effect.provide(locationServiceMapLayer),
+      )
+
+      const output = yield* prompt.beliefs()
+      expect(output).toContain("Project beliefs")
+      expect(output).toContain("[control-flow] Prefer early returns")
+      expect(output).not.toContain("Name booleans with is")
     }),
   )
 

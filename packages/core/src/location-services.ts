@@ -1,5 +1,6 @@
 import { Effect, Layer, LayerMap } from "effect"
 import { AgentV2 } from "./agent"
+import { BeliefStore } from "./belief/store"
 import { AISDK } from "./aisdk"
 import { Catalog } from "./catalog"
 import { CommandV2 } from "./command"
@@ -70,6 +71,7 @@ export const locationServices = LayerNode.group([
   SkillGuidance.node,
   ReferenceGuidance.node,
   SessionTodo.node,
+  BeliefStore.node,
   QuestionV2.node,
   ReadToolFileSystem.node,
   BuiltInTools.node,
