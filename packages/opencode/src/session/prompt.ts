@@ -1177,7 +1177,7 @@ const layer = Layer.effect(
           }
           const maxSteps = agent.steps ?? Infinity
           const isLastStep = step >= maxSteps
-          msgs = yield* SessionReminders.apply({ messages: msgs, agent, session }).pipe(
+          msgs = yield* SessionReminders.apply({ messages: msgs, agent, session, model }).pipe(
             Effect.provideService(RuntimeFlags.Service, flags),
             Effect.provideService(FSUtil.Service, fsys),
             Effect.provideService(Session.Service, sessions),
@@ -1254,8 +1254,9 @@ const layer = Layer.effect(
 
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
-            const [skills, env, instructions, mcpInstructions, beliefs, modelMsgs] = yield* Effect.all([
+            const [skills, hint, env, instructions, mcpInstructions, beliefs, modelMsgs] = yield* Effect.all([
               sys.skills(agent),
+              sys.hint(agent),
               sys.environment(model),
               instruction.system().pipe(Effect.orDie),
               sys.mcp(agent, session.permission),
@@ -1268,6 +1269,7 @@ const layer = Layer.effect(
               ...(beliefs ? [beliefs] : []),
               ...(mcpInstructions ? [mcpInstructions] : []),
               ...(skills ? [skills] : []),
+              ...(hint ? [hint] : []),
             ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)

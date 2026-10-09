@@ -46,6 +46,7 @@ export function provider(model: Provider.Model) {
 export interface Interface {
   readonly environment: (model: Provider.Model) => Effect.Effect<string[]>
   readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
+  readonly hint: (agent: Agent.Info) => Effect.Effect<string | undefined>
   readonly mcp: (agent: Agent.Info, permission?: PermissionV1.Ruleset) => Effect.Effect<string | undefined>
   readonly beliefs: () => Effect.Effect<string | undefined>
 }
@@ -122,6 +123,21 @@ const layer = Layer.effect(
           typeof loaded === "symbol" ? [] : BeliefContext.visibleLines(index === 0 ? "project" : "personal", loaded),
         )
         return lines.length === 0 ? undefined : BeliefContext.render(lines)
+      }),
+
+      hint: Effect.fn("SystemPrompt.hint")(function* (agent: Agent.Info) {
+        if (!agent.hintMode) return
+
+        return [
+          "<hint_mode>",
+          "You are operating in hint mode. The student is trying to learn, not just get a working answer.",
+          "Do not provide a complete solution immediately. Instead:",
+          "  1. Ask clarifying questions if the problem is ambiguous.",
+          "  2. Give a small, targeted hint that nudges the student toward the next step.",
+          "  3. Only provide a full solution if the student explicitly asks for one after hints,",
+          "     or has made a genuine attempt and is still stuck.",
+          "</hint_mode>",
+        ].join("\n")
       }),
 
       mcp: Effect.fn("SystemPrompt.mcp")(function* (agent: Agent.Info, permission?: PermissionV1.Ruleset) {

@@ -57,7 +57,11 @@ Goal: Review the plan(s) from Phase 2 and ensure alignment with the user's inten
 Goal: Write your final plan to the plan file (the only file you can edit).
 - Include only your recommended approach, not all alternatives
 - Ensure that the plan file is concise enough to scan quickly, but detailed enough to execute effectively
+- Include separate `Proposed Changes` and `Reasoning` sections
+- In `Proposed Changes`, identify each relevant file or component and describe what would change
+- In `Reasoning`, explain why each identified file or component is relevant to the user's request
 - Include the paths of critical files to be modified
+- Do not edit any project files while producing or reviewing this explanation; the plan file remains the only allowed edit
 - Include a verification section describing how to test the changes end-to-end (run the code, use MCP tools, run tests)
 
 ### Phase 5: Call plan_exit tool
