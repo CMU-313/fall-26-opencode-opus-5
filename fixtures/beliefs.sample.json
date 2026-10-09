@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "topics": ["comments", "control-flow", "imports", "naming"],
+  "beliefs": [
+    {
+      "id": "bel_held_comments",
+      "statement": "Comments should explain why code does something non-obvious, not what it does.",
+      "topics": ["comments"],
+      "scope": ["**"],
+      "assertions": [
+        { "by": "owner", "how": "stated", "ref": "msg_01k1owner0comments", "at": 1785585600000 }
+      ],
+      "rejections": [],
+      "evidence": []
+    },
+    {
+      "id": "bel_learned_controlflow",
+      "statement": "Prefer early returns over else branches to keep functions flat.",
+      "topics": ["control-flow"],
+      "scope": ["**"],
+      "assertions": [
+        { "by": "agent", "how": "learned", "ref": "msg_01k1agent0controlflow", "at": 1788271200000 }
+      ],
+      "rejections": [],
+      "evidence": [
+        { "kind": "correction", "ref": "msg_01k1correction0001", "session": "ses_01k1session0001", "at": 1786786200000 },
+        { "kind": "correction", "ref": "msg_01k1correction0002", "session": "ses_01k1session0002", "at": 1788271200000 }
+      ]
+    },
+    {
+      "id": "bel_rejected_imports",
+      "statement": "Group third-party imports separately from relative imports with a blank line.",
+      "topics": ["imports"],
+      "scope": ["**"],
+      "assertions": [
+        { "by": "agent", "how": "observed", "ref": "msg_01k1agent0imports", "at": 1787223600000 }
+      ],
+      "rejections": [
+        { "by": "owner", "ref": "msg_01k1owner0rejectimports", "at": 1788603300000 }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "bel_hypothesis_naming",
+      "statement": "Boolean variables should be prefixed with is, has, or should.",
+      "topics": ["naming"],
+      "scope": ["**"],
+      "assertions": [
+        { "by": "agent", "how": "assumed", "ref": "msg_01k1agent0naming", "at": 1789058700000 }
+      ],
+      "rejections": [],
+      "evidence": []
+    }
+  ]
+}
