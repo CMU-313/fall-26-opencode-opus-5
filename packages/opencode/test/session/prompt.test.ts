@@ -57,6 +57,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { MAX_COST_PROMPT } from "@opencode-ai/core/session/runner/max-cost"
 
 const summary = Layer.succeed(
   SessionSummary.Service,
@@ -909,6 +910,278 @@ it.instance("loop continues when finish is tool-calls", () =>
       expect(result.info.finish).toBe("stop")
     }
   }),
+)
+
+//----- testing for api spending cap
+
+const PRICE_PER_MILLION_TOKENS = 1000
+const tokensFor = (dollars: number) => Math.round((dollars * 1_000_000) / PRICE_PER_MILLION_TOKENS)
+ 
+// Config with a priced model and an optional per-agent maxCost, i.e. what a user used to
+// put in opencode.json.
+const costCfg = (maxCost?: number) => (url: string) => {
+  const base = providerCfg(url)
+  return {
+    ...base,
+    provider: {
+      ...base.provider,
+      test: {
+        ...base.provider.test,
+        models: {
+          "test-model": {
+            ...base.provider.test.models["test-model"],
+            cost: { input: PRICE_PER_MILLION_TOKENS, output: 0 },
+          },
+        },
+      },
+    },
+    ...(maxCost === undefined ? {} : { agent: { build: { maxCost } } }),
+  }
+}
+ 
+function textOf(parts: SessionV1.Part[]) {
+  return parts.flatMap((part) => (part.type === "text" ? [part.text] : []))
+}
+ 
+const sessionCost = Effect.fn("test.sessionCost")(function* (sessionID: SessionID) {
+  const sessions = yield* Session.Service
+  const info = yield* sessions.get(sessionID)
+  return info.cost ?? 0
+})
+ 
+// Runs one complete turn whose LLM reply reports enough token usage to cost `dollars`.
+const spendDollars = Effect.fn("test.spendDollars")(function* (sessionID: SessionID, dollars: number) {
+  const llm = yield* TestLLMServer
+  const prompt = yield* SessionPrompt.Service
+  yield* prompt.prompt({
+    sessionID,
+    agent: "build",
+    noReply: true,
+    parts: [{ type: "text", text: "earlier request" }],
+  })
+  yield* llm.push(reply().text("earlier reply").usage({ input: tokensFor(dollars), output: 0 }).stop())
+  yield* prompt.loop({ sessionID })
+})
+ 
+// A session that has already spent `dollars` and has a new user message waiting.
+// Asserts the spend is visible on the session, so a failure here means "usage is not
+// being read", not "the limit is broken". `baseline` is the number of LLM requests made
+// so far (by the spend turn), so tests can assert "no further request was made".
+const chatWithSpend = Effect.fn("test.chatWithSpend")(function* (dollars: number) {
+  const llm = yield* TestLLMServer
+  const sessions = yield* Session.Service
+  const chat = yield* sessions.create({
+    title: "Pinned",
+    permission: [{ permission: "*", pattern: "*", action: "allow" }],
+  })
+  yield* spendDollars(chat.id, dollars)
+  yield* user(chat.id, "new request")
+  expect(yield* sessionCost(chat.id)).toBeCloseTo(dollars, 6)
+  const baseline = (yield* llm.hits).length
+  return { chat, baseline }
+})
+ 
+// ---- AC2: usage is readable --------------------------------------------------
+ 
+it.instance("usage: a new session reports zero spend", () =>
+  Effect.gen(function* () {
+    yield* useServerConfig(costCfg())
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({ title: "Pinned" })
+ 
+    expect(yield* sessionCost(chat.id)).toBe(0)
+  }),
+  15_000,
+)
+ 
+it.instance("usage: session cost is the sum of the spend from each turn", () =>
+  Effect.gen(function* () {
+    yield* useServerConfig(costCfg())
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({
+      title: "Pinned",
+      permission: [{ permission: "*", pattern: "*", action: "allow" }],
+    })
+ 
+    yield* spendDollars(chat.id, 0.25)
+    expect(yield* sessionCost(chat.id)).toBeCloseTo(0.25, 6)
+    yield* spendDollars(chat.id, 0.5)
+ 
+    expect(yield* sessionCost(chat.id)).toBeCloseTo(0.75, 6)
+  }),
+  15_000,
+)
+ 
+// ---- AC3: the loop halts at the limit ---------------------------------------
+ 
+it.instance("halt: agent maxCost stops the loop before any LLM request once spend exceeds it", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(costCfg(1))
+    const prompt = yield* SessionPrompt.Service
+    const { chat, baseline } = yield* chatWithSpend(1.5)
+ 
+    const result = yield* prompt.loop({ sessionID: chat.id })
+ 
+    expect(result.info.role).toBe("assistant")
+    expect(textOf(result.parts)).toContain(MAX_COST_PROMPT)
+    expect(yield* llm.hits).toHaveLength(baseline)
+  }),
+  15_000,
+)
+ 
+it.instance("halt: spend exactly equal to the limit halts (limit is inclusive)", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(costCfg(1))
+    const prompt = yield* SessionPrompt.Service
+    const { chat, baseline } = yield* chatWithSpend(1)
+ 
+    const result = yield* prompt.loop({ sessionID: chat.id })
+ 
+    expect(textOf(result.parts)).toContain(MAX_COST_PROMPT)
+    expect(yield* llm.hits).toHaveLength(baseline)
+  }),
+  15_000,
+)
+ 
+it.instance("halt: spend under the limit does not halt and the LLM is called", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(costCfg(1))
+    const prompt = yield* SessionPrompt.Service
+    const { chat, baseline } = yield* chatWithSpend(0.4)
+    yield* llm.text("world")
+ 
+    const result = yield* prompt.loop({ sessionID: chat.id })
+ 
+    expect(textOf(result.parts)).toContain("world")
+    expect(textOf(result.parts)).not.toContain(MAX_COST_PROMPT)
+    expect(yield* llm.hits).toHaveLength(baseline + 1)
+  }),
+  15_000,
+)
+ 
+it.instance("halt: no limit configured means no halt, however much was spent", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(costCfg())
+    const prompt = yield* SessionPrompt.Service
+    const { chat, baseline } = yield* chatWithSpend(100)
+    yield* llm.text("world")
+ 
+    const result = yield* prompt.loop({ sessionID: chat.id })
+ 
+    expect(textOf(result.parts)).toContain("world")
+    expect(yield* llm.hits).toHaveLength(baseline + 1)
+  }),
+  15_000,
+)
+ 
+// ---- AC1 (backend): a per-session limit, as set by /maxcost -------------------
+ 
+it.instance("session limit: works with no agent maxCost configured (the /maxcost case)", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(costCfg())
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const { chat, baseline } = yield* chatWithSpend(1.5)
+    yield* sessions.setMetadata({ sessionID: chat.id, metadata: { maxCost: 1 } })
+ 
+    const result = yield* prompt.loop({ sessionID: chat.id })
+ 
+    expect(textOf(result.parts)).toContain(MAX_COST_PROMPT)
+    expect(yield* llm.hits).toHaveLength(baseline)
+  }),
+  15_000,
+)
+ 
+it.instance("session limit: a lower session limit overrides a higher agent maxCost", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(costCfg(100))
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const { chat, baseline } = yield* chatWithSpend(1.5)
+    yield* sessions.setMetadata({ sessionID: chat.id, metadata: { maxCost: 1 } })
+ 
+    const result = yield* prompt.loop({ sessionID: chat.id })
+ 
+    expect(textOf(result.parts)).toContain(MAX_COST_PROMPT)
+    expect(yield* llm.hits).toHaveLength(baseline)
+  }),
+  15_000,
+)
+ 
+it.instance("session limit: a higher session limit overrides a lower agent maxCost", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(costCfg(1))
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const { chat, baseline } = yield* chatWithSpend(1.5)
+    yield* sessions.setMetadata({ sessionID: chat.id, metadata: { maxCost: 10 } })
+    yield* llm.text("world")
+ 
+    const result = yield* prompt.loop({ sessionID: chat.id })
+ 
+    expect(textOf(result.parts)).toContain("world")
+    expect(yield* llm.hits).toHaveLength(baseline + 1)
+  }),
+  15_000,
+)
+ 
+it.instance("session limit: clearing it falls back to the agent maxCost", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(costCfg(100))
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const { chat, baseline } = yield* chatWithSpend(1.5)
+    yield* sessions.setMetadata({ sessionID: chat.id, metadata: { maxCost: 1 } })
+    yield* sessions.setMetadata({ sessionID: chat.id, metadata: {} }) // what a blank /maxcost does
+    yield* llm.text("world")
+ 
+    const result = yield* prompt.loop({ sessionID: chat.id })
+ 
+    expect(textOf(result.parts)).toContain("world")
+    expect(yield* llm.hits).toHaveLength(baseline + 1)
+  }),
+  15_000,
+)
+ 
+it.instance("session limit: a non-numeric value is ignored", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(costCfg(100))
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const { chat, baseline } = yield* chatWithSpend(1.5)
+    yield* sessions.setMetadata({ sessionID: chat.id, metadata: { maxCost: "abc" } })
+    yield* llm.text("world")
+ 
+    const result = yield* prompt.loop({ sessionID: chat.id })
+ 
+    expect(textOf(result.parts)).toContain("world")
+    expect(yield* llm.hits).toHaveLength(baseline + 1)
+  }),
+  15_000,
+)
+ 
+it.instance("session limit: setting it mid-session halts the next turn", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(costCfg())
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const { chat, baseline } = yield* chatWithSpend(1.5)
+ 
+    // Turn 1: no limit yet, so the model is called.
+    yield* llm.text("first reply")
+    const first = yield* prompt.loop({ sessionID: chat.id })
+    expect(textOf(first.parts)).toContain("first reply")
+    expect(yield* llm.hits).toHaveLength(baseline + 1)
+ 
+    // The user now runs /maxcost 1 (spend is already 1.5), then sends another message.
+    yield* sessions.setMetadata({ sessionID: chat.id, metadata: { maxCost: 1 } })
+    yield* user(chat.id, "another request")
+    const second = yield* prompt.loop({ sessionID: chat.id })
+ 
+    expect(textOf(second.parts)).toContain(MAX_COST_PROMPT)
+    expect(yield* llm.hits).toHaveLength(baseline + 1) // no new request was made
+  }),
+  15_000,
 )
 
 it.instance("glob tool keeps instance context during prompt runs", () =>

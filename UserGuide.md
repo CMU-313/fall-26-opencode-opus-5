@@ -186,3 +186,52 @@ cd packages/opencode && bun test test/session/system.test.ts test/tool/registry.
 | [`packages/opencode/test/session/system.test.ts`](packages/opencode/test/session/system.test.ts) | The `bun dev` system prompt includes confirmed beliefs and leaves out hypotheses |
 
 **Why this is enough:** every acceptance criterion in #8 has at least one test that fails if the behavior breaks. The tests run against the real store, schema, and context code on temporary directories, not mocks. Only the question and permission services are replaced, so the tests can answer for the owner. Both integration points are covered: the Core tool and context source, and the `bun dev` session that users actually run. The one thing the automated tests do not exercise is a live model deciding to call the tool, which is what the manual steps above are for.
+
+## Session spending limit (#7)
+
+Opencode can stop a session automatically once it has spent a set amount on model API usage. The limit can be set for the current session with the `/maxcost` command, or ahead of time per agent in `opencode.json` (so there is no need to hand-edit a config file to cap one session).
+
+### Usage
+
+| Action | How |
+|---|---|
+| Set a limit for this session | `/maxcost`, then enter a dollar amount such as `2.50` |
+| Clear the session limit | `/maxcost`, then confirm with the field left blank |
+| Set a default limit for an agent | Add `maxCost` to the agent in `opencode.json`, e.g. `{"agent": {"build": {"maxCost": 2.5}}}` |
+| Continue after the limit is reached | Run `/maxcost` with a higher amount (or blank), then send another message |
+
+- Spend is the session's running total, calculated from the tokens each model step used and the model's configured price.
+- Before every step, opencode compares spend with the limit. If spend is **greater than or equal to** the limit, it makes no further model requests for that turn and posts a message saying the cost cap was reached.
+- Which limit applies: the session limit from `/maxcost` if there is one, otherwise the agent's `maxCost`, otherwise no limit. A session limit overrides the config value whether it is lower or higher.
+- `/maxcost` only appears inside a session. It accepts a positive number; zero, negative values and non-numbers are refused with "Enter a positive number" and nothing changes.
+- The session limit is saved with the session (in its metadata), so it persists when you restart opencode and reopen the session, and is not shared with other sessions.
+- The limit is re-read on every step, so a new value takes effect on the next step without restarting.
+- The check runs before each step, not during one, so spend can exceed the limit by up to the cost of one step.
+- A model with no configured price (for example many local models) always has $0 spend, so it never reaches a limit.
+- `/maxcost` is part of the terminal UI. The `opencode.json` option works everywhere.
+
+### Trying it out
+
+1. Start opencode with `bun dev <project-dir>` and use `/connect` to add a provider whose models have a price. A model with no price never accrues spend, so the limit cannot trigger.
+2. Start a session and run `/maxcost`. Enter `abc`, then `-1`. Each shows "Enter a positive number" and no limit is set.
+3. Run `/maxcost` and enter `0.01`. A "Spending limit set to $0.01" toast appears.
+4. Ask for something that takes several steps, e.g. "Read every file in src and summarize each one." After the step that takes spend to $0.01 or more, the agent stops with a message that the cost cap was reached, and no further model requests are made.
+5. Send another message. It stops immediately with the same message, because spend is already over the limit.
+6. Run `/maxcost`. The dialog is pre-filled with `0.01`. Enter `5`, then send another message. The agent works normally again.
+7. Run `/maxcost` and confirm with the field blank. A "Spending limit cleared" toast appears and there is no limit.
+8. Add `{"agent": {"build": {"maxCost": 0.01}}}` to the project's `opencode.json` and start a **new** session. Repeat step 4. It stops without any `/maxcost` command. Then run `/maxcost` and enter `5`: the session limit overrides the config value and the agent continues.
+9. Set a limit with `/maxcost`, quit opencode, reopen the same session and run `/maxcost`. The dialog shows the saved value.
+
+### Automated tests
+
+```sh
+cd packages/opencode && bun test --timeout 30000 test/session/prompt.test.ts -t "usage:|halt:|session limit:"
+```
+
+| File | What it covers |
+|---|---|
+| `packages/opencode/test/session/prompt.test.ts` (tests named "usage:") | A new session reports $0 spend, and session cost is the sum of the spend from each turn |
+| `packages/opencode/test/session/prompt.test.ts` (tests named "halt:") | With an agent `maxCost`, the loop makes no LLM request once spend is over the limit or exactly at it, still calls the model when spend is under it, and never halts when no limit is configured |
+| `packages/opencode/test/session/prompt.test.ts` (tests named "session limit:") | The `/maxcost` case with no agent limit configured, a session limit overriding a higher and a lower agent limit, clearing the limit falling back to the agent value, a non-numeric value being ignored, and a limit set mid-session halting the next turn |
+
+**Why this is sufficient:** each acceptance criterion in #7 is checked where it can fail. The tests run the real session loop against a scripted LLM server with a priced test model, so spend is produced by the same path as in normal use: token usage is priced and added to the session total. That covers reading usage, and the "halt" tests assert on the number of requests the LLM server actually received, not on an internal flag, so they would fail if the limit check were removed or broken. The override tests exercise the exact data the `/maxcost` dialog writes (`maxCost` in session metadata), in both directions, when cleared, and when changed mid-session.
