@@ -447,6 +447,23 @@ export function Autocomplete(props: {
   const commands = createMemo((): AutocompleteOption[] => {
     const results: AutocompleteOption[] = [...slashes()]
 
+    for (const pin of [
+      { name: "pin", description: "Keep a file in the agent's context every turn" },
+      { name: "unpin", description: "Stop keeping a pinned file in context" },
+    ]) {
+      results.push({
+        display: "/" + pin.name,
+        description: pin.description,
+        onSelect: () => {
+          const newText = "/" + pin.name + " "
+          const cursor = props.input().logicalCursor
+          props.input().deleteRange(0, 0, cursor.row, cursor.col)
+          props.input().insertText(newText)
+          props.input().cursorOffset = Bun.stringWidth(newText)
+        },
+      })
+    }
+
     for (const serverCommand of sync.data.command) {
       if (serverCommand.source === "skill") continue
       const label = serverCommand.source === "mcp" ? ":mcp" : ""

@@ -2501,3 +2501,107 @@ noLLMServer.instance(
     }),
   30_000,
 )
+
+const pinnedSymbol = "PINNED_ONLY_SYMBOL_42"
+
+const pinnedTurn = Effect.fn("test.pinnedTurn")(function* (sessionID: SessionID, text: string) {
+  const prompt = yield* SessionPrompt.Service
+  const llm = yield* TestLLMServer
+  yield* prompt.prompt({ sessionID, agent: "build", model: ref, noReply: true, parts: [{ type: "text", text }] })
+  yield* llm.text(`reply to ${text}`)
+  yield* prompt.loop({ sessionID })
+  const hits = yield* llm.hits
+  return JSON.stringify(hits.at(-1)?.body)
+})
+
+it.instance(
+  "pinned files are injected into every turn without being re-mentioned",
+  () =>
+    Effect.gen(function* () {
+      const { dir } = yield* useServerConfig(providerCfg)
+      yield* writeText(path.join(dir, "src", "pinned.ts"), `export const ${pinnedSymbol} = 1\n`)
+      const sessions = yield* Session.Service
+      const chat = yield* sessions.create({ title: "Pinned", metadata: { pinnedFiles: ["src/pinned.ts"] } })
+
+      for (const turn of [1, 2, 3, 4, 5]) {
+        const body = yield* pinnedTurn(chat.id, `question ${turn}`)
+        expect(body).toContain(`question ${turn}`)
+        expect(body).toContain('<pinned-file path=\\"src/pinned.ts\\">')
+        expect(body).toContain(pinnedSymbol)
+      }
+
+      // pinned content is attached per request, not persisted into history
+      const stored = yield* sessions.messages({ sessionID: chat.id })
+      expect(JSON.stringify(stored)).not.toContain(pinnedSymbol)
+    }),
+  30_000,
+)
+
+it.instance(
+  "pinned files reflect edits and unpinning between turns",
+  () =>
+    Effect.gen(function* () {
+      const { dir } = yield* useServerConfig(providerCfg)
+      const file = path.join(dir, "src", "pinned.ts")
+      yield* writeText(file, "export const FIRST_VERSION = 1\n")
+      const sessions = yield* Session.Service
+      const chat = yield* sessions.create({ title: "Pinned", metadata: { pinnedFiles: ["src/pinned.ts"] } })
+
+      expect(yield* pinnedTurn(chat.id, "one")).toContain("FIRST_VERSION")
+
+      yield* writeText(file, "export const SECOND_VERSION = 2\n")
+      const second = yield* pinnedTurn(chat.id, "two")
+      expect(second).toContain("SECOND_VERSION")
+      expect(second).not.toContain("FIRST_VERSION")
+
+      yield* sessions.setMetadata({ sessionID: chat.id, metadata: { pinnedFiles: [] } })
+      expect(yield* pinnedTurn(chat.id, "three")).not.toContain("SECOND_VERSION")
+    }),
+  30_000,
+)
+
+it.instance(
+  "pinned files survive compaction",
+  () =>
+    Effect.gen(function* () {
+      const { dir, llm } = yield* useServerConfig(providerCfg)
+      yield* writeText(path.join(dir, "src", "pinned.ts"), `export const ${pinnedSymbol} = 1\n`)
+      const sessions = yield* Session.Service
+      const compaction = yield* SessionCompaction.Service
+      const prompt = yield* SessionPrompt.Service
+      const chat = yield* sessions.create({ title: "Pinned", metadata: { pinnedFiles: ["src/pinned.ts"] } })
+
+      yield* pinnedTurn(chat.id, "before compaction")
+
+      yield* compaction.create({ sessionID: chat.id, agent: "build", model: ref, auto: false })
+      yield* llm.text("summary of earlier work")
+      yield* prompt.loop({ sessionID: chat.id })
+      const stored = yield* sessions.messages({ sessionID: chat.id })
+      expect(stored.some((msg) => msg.parts.some((part) => part.type === "compaction"))).toBe(true)
+
+      const body = yield* pinnedTurn(chat.id, "after compaction")
+      expect(body).toContain("summary of earlier work")
+      expect(body).toContain(pinnedSymbol)
+    }),
+  30_000,
+)
+
+it.instance(
+  "pinned files outside the project are not read",
+  () =>
+    Effect.gen(function* () {
+      const { dir } = yield* useServerConfig(providerCfg)
+      const outside = path.join(path.dirname(dir), `${path.basename(dir)}-outside.txt`)
+      yield* writeText(outside, "OUTSIDE_SECRET_VALUE\n")
+      const sessions = yield* Session.Service
+      const chat = yield* sessions.create({
+        title: "Pinned",
+        metadata: { pinnedFiles: [path.relative(dir, outside), outside] },
+      })
+
+      const body = yield* pinnedTurn(chat.id, "hello")
+      expect(body).toContain('missing=\\"true\\"')
+      expect(body).not.toContain("OUTSIDE_SECRET_VALUE")
+    }),
+  30_000,
+)
