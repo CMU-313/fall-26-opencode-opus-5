@@ -56,8 +56,6 @@ cd packages/tui && bun test test/prompt/pin.test.ts
 
 **Why this is sufficient:** each acceptance criterion of #4 is checked at the level where it can fail. The core promise ("the model sees the file on later turns") is asserted on the actual HTTP request body sent to the model, not on internal state, so it would fail if injection, storage or compaction broke. Those integration tests also fail when the injection code is removed. The state and limit logic is pure and covered with edge cases. The TUI pieces (toasts, sidebar, keybind dialog) are thin wrappers over that logic. The repo has no TUI rendering test harness, so they were verified manually using the steps above, with screenshots in PRs #13 and #14.
 
-
-
 ## Hint Agent (#6)
 
 OpenCode's existing agents are designed to complete programming tasks directly. The Hint Agent is designed for students who want to learn by working through problems themselves. Instead of immediately giving a complete solution, it prioritizes clarifying questions, small hints, and guidance toward the next step.
@@ -104,3 +102,31 @@ bun test --timeout 30000 test/session/prompt.test.ts -t "hint-mode"
 | `packages/opencode/test/session/prompt.test.ts` (tests named "hint-mode") | Integration tests that run the session loop against a scripted LLM server and inspect the actual model request. They verify that hint instructions are included for the Hint Agent and omitted for the Build Agent |
 
 **Why this is sufficient:** the tests cover the main acceptance criteria of #6 at multiple levels. The agent tests verify that the Hint Agent is registered and configured correctly. The system prompt tests verify that hint instructions are generated only when hint mode is enabled. Most importantly, the integration tests inspect the actual request sent to the model, rather than only checking internal configuration. This confirms that the hint instructions reach the LLM and that existing agents are not affected. The tests would fail if the hint instructions were no longer included in the model request. Since language model responses are nondeterministic, automated tests cannot guarantee that every response will follow the instructions exactly. The manual testing steps above provide an additional check of the intended learning behavior.
+
+## Plan reasoning (#3)
+
+Plan mode explains which files or components a proposed change involves and why each one matters, before implementation begins.
+
+### Usage
+
+Select the Plan agent in the TUI (use `tab` to cycle agents), then describe a change you want to make. The plan should have separate `Proposed Changes` and `Reasoning` sections. Review the explanation before approving implementation.
+
+### Trying it out
+
+1. Open a project in opencode, select Plan, and ask: "Add input validation to the configuration loader. First explain which files you would change and why."
+2. Check that `Proposed Changes` names the relevant files or components and describes the changes, while `Reasoning` explains why each is relevant.
+3. Check that reviewing the plan has not changed project files. Repeat with another planning request to confirm normal planning still works.
+
+### Automated tests
+
+```sh
+cd packages/opencode && bun test --timeout 30000 test/session/plan-prompt.test.ts
+cd packages/session-ui && bun test src/components/markdown-stream.test.ts
+```
+
+| File | What it covers |
+|---|---|
+| `packages/opencode/test/session/plan-prompt.test.ts` | Both planning prompts request separate sections, relevant files or components, reasons for each, and no project-file edits |
+| `packages/session-ui/src/components/markdown-stream.test.ts` | A sample completed planning response retains both sections and their explanations through Markdown projection |
+
+**Why this is sufficient:** the prompt tests cover the instructions that produce the new behavior in both planning modes; the Markdown test covers preservation of the response text. The steps above verify the actual model response and read-only behavior, which prompt and projection tests alone cannot guarantee.

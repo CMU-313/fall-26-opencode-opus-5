@@ -228,4 +228,24 @@ describe("markdown stream", () => {
       complete: true,
     })
   })
+
+  test("preserves proposed changes and reasoning in a completed planning response", () => {
+    const response = [
+      "## Proposed Changes",
+      "",
+      "- `src/session.ts`: Add the planning response requirements.",
+      "",
+      "## Reasoning",
+      "",
+      "- `src/session.ts` builds the planning prompt used for this request.",
+    ].join("\n")
+    const completed = project(undefined, response, false)
+    const rendered = completed.blocks.map((block) => block.raw).join("")
+
+    expect(rendered).toBe(response)
+    expect(rendered).toContain("## Proposed Changes")
+    expect(rendered).toContain("`src/session.ts`: Add the planning response requirements.")
+    expect(rendered).toContain("## Reasoning")
+    expect(rendered).toContain("`src/session.ts` builds the planning prompt used for this request.")
+  })
 })
