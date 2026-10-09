@@ -52,6 +52,7 @@ import type { PromptInfo } from "../../component/prompt/history"
 import { DialogConfirm } from "../../ui/dialog-confirm"
 import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
+import { DialogPinnedFiles } from "../../component/dialog-pinned-files"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
 import { Sidebar } from "./sidebar"
 import { SubagentFooter } from "./subagent-footer.tsx"
@@ -119,6 +120,7 @@ const sessionBindingCommands = [
   "session.timeline",
   "session.fork",
   "session.compact",
+  "session.file_pin.list",
   "session.unshare",
   "session.undo",
   "session.redo",
@@ -583,6 +585,17 @@ export function Session() {
           providerID: selectedModel.providerID,
         })
         dialog.clear()
+      },
+    },
+    {
+      title: "Pinned files",
+      value: "session.file_pin.list",
+      category: "Session",
+      slash: {
+        name: "pinned",
+      },
+      run: () => {
+        dialog.replace(() => <DialogPinnedFiles session={route.sessionID} />)
       },
     },
     {
