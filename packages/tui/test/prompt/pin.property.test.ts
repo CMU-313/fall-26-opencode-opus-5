@@ -97,7 +97,7 @@ describe("pin command properties", () => {
           command: { action: "pin", path: file },
         })
         expect(result.type).toBe(ignored ? "warning" : "success")
-        expect(result.message.includes(".gitignore")).toBe(ignored)
+        expect(result.message.includes("matches .gitignore")).toBe(ignored)
       }),
     )
   })
