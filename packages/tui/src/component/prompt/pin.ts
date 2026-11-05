@@ -18,12 +18,13 @@ export function parsePinCommand(input: string): PinCommand | undefined {
   return { action: match[1] as PinCommand["action"], path: (match[2] ?? "").trim() }
 }
 
-async function isFile(client: OpencodeClient, file: string) {
+// The file listing entry for `file`, or undefined if it isn't a file in the project.
+async function lookup(client: OpencodeClient, file: string) {
   const dir = path.posix.dirname(file)
   const res = await client.file.list({ path: dir === "." ? "" : dir })
-  if (res.error || !res.data) return false
+  if (res.error || !res.data) return undefined
   const name = path.posix.basename(file)
-  return res.data.some((item) => item.name === name && item.type === "file")
+  return res.data.find((item) => item.name === name && item.type === "file")
 }
 
 async function tokens(client: OpencodeClient, files: readonly string[]) {
@@ -64,7 +65,8 @@ export async function runPinCommand(input: {
     return { type: "error", message: `${file} is outside the project` }
   }
   if (current.includes(file)) return { type: "error", message: `${file} is already pinned` }
-  if (!(await isFile(input.client, file))) return { type: "error", message: `${file} is not a file in this project` }
+  const entry = await lookup(input.client, file)
+  if (!entry) return { type: "error", message: `${file} is not a file in this project` }
 
   const files = Pinned.add(current, file)
   const bounds = Pinned.check(await tokens(client, files), Pinned.limit(input.model))
@@ -80,12 +82,12 @@ export async function runPinCommand(input: {
     metadata: Pinned.withFiles(session.metadata, files),
   })
   if (res.error) return { type: "error", message: `Failed to pin ${file}` }
+  // Gitignored files (often secrets like .env) are still pinned, but the user is warned.
+  const warnings: string[] = []
+  if (entry.ignored) warnings.push(`${file} matches .gitignore`)
   if (bounds.tokens > bounds.limit * 0.8) {
-    return {
-      type: "warning",
-      message: `Pinned ${file}. Pinned files use ~${bounds.tokens.toLocaleString()} of ${bounds.limit.toLocaleString()} tokens`,
-      files,
-    }
+    warnings.push(`Pinned files use ~${bounds.tokens.toLocaleString()} of ${bounds.limit.toLocaleString()} tokens`)
   }
+  if (warnings.length > 0) return { type: "warning", message: [`Pinned ${file}`, ...warnings].join(". "), files }
   return { type: "success", message: `Pinned ${file}`, files }
 }
