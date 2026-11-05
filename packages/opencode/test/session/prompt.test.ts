@@ -6,6 +6,7 @@ import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { eq } from "drizzle-orm"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { expect } from "bun:test"
+import fc from "fast-check"
 import { Cause, Deferred, Duration, Effect, Exit, Fiber, Layer } from "effect"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -2786,6 +2787,49 @@ const pinnedTurn = Effect.fn("test.pinnedTurn")(function* (sessionID: SessionID,
   const hits = yield* llm.hits
   return JSON.stringify(hits.at(-1)?.body)
 })
+
+// R4: Successfully pinned, readable files whose combined estimated size fits
+// within the pinning budget must have their contents included in the next model request.
+// Kind: model/oracle. A map of real file contents is the oracle, compared with
+// the captured HTTP provider request. Nested same-basename paths and empty,
+// Unicode, and multiline contents stay far below this model's 25,000-token budget.
+it.instance(
+  "R4: eligible pinned file contents reach the actual model request (property)",
+  () =>
+    Effect.gen(function* () {
+      const config = yield* useServerConfig(providerCfg)
+      const context = yield* Effect.context<FSUtil.Service | Session.Service | SessionPrompt.Service | TestLLMServer>()
+      yield* Effect.promise(() =>
+        fc.assert(
+          fc.asyncProperty(
+            fc.array(fc.oneof(fc.string({ maxLength: 200 }), fc.constant(""), fc.constant("日本語\nline two\n")), {
+              minLength: 1,
+              maxLength: 4,
+            }),
+            (contents) =>
+              Effect.runPromiseWith(context)(
+                Effect.gen(function* () {
+                  const files = contents.map((content, index) => ({ path: `property/${index}/config.txt`, content }))
+                  yield* Effect.forEach(files, (file) => writeText(path.join(config.dir, file.path), file.content))
+                  const sessions = yield* Session.Service
+                  const chat = yield* sessions.create({
+                    title: "R4 property",
+                    metadata: { pinnedFiles: files.map((file) => file.path) },
+                  })
+                  const body = yield* pinnedTurn(chat.id, "Inspect the pinned files.")
+                  files.forEach((file) => {
+                    const block = `<pinned-file path="${file.path}">\n${file.content}\n</pinned-file>`
+                    expect(body).toContain(JSON.stringify(block).slice(1, -1))
+                  })
+                }),
+              ),
+          ),
+          { numRuns: 100, examples: [[["DEMO_CODE = blue-giraffe-42"]]] },
+        ),
+      )
+    }),
+  60_000,
+)
 
 it.instance(
   "pinned files are injected into every turn without being re-mentioned",
