@@ -69,6 +69,13 @@ jobs:
         working-directory: packages/client
         run: bun run check:generated
 
+      # The package test script uses --only-failures, which hides passing tests.
+      # Run these explicitly so the log shows each permission property passing.
+      - name: Run permission properties
+        timeout-minutes: 2
+        working-directory: packages/opencode
+        run: bun test test/permission/permission.property.test.ts --timeout 30000
+
   e2e:
     name: e2e (smoke)
     runs-on: ubuntu-latest
