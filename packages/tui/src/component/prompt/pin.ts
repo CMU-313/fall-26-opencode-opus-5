@@ -27,6 +27,18 @@ async function lookup(client: OpencodeClient, file: string) {
   return res.data.find((item) => item.name === name && item.type === "file")
 }
 
+// Pinned paths that are no longer files in the project, checked when a message is sent.
+export async function missingPins(client: OpencodeClient, session: Session) {
+  const files = Pinned.list(session.metadata)
+  const entries = await Promise.all(files.map((file) => lookup(client, file)))
+  return files.filter((_, i) => !entries[i])
+}
+
+export function missingMessage(files: readonly string[]) {
+  if (files.length === 0) return undefined
+  return `Pinned file${files.length === 1 ? "" : "s"} not found: ${files.join(", ")}`
+}
+
 async function tokens(client: OpencodeClient, files: readonly string[]) {
   const sizes = await Promise.all(
     files.map(async (file) => {
