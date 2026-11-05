@@ -1,5 +1,5 @@
 import { createMemo } from "solid-js"
-import { Pinned } from "@opencode-ai/core/util/pinned"
+import { pinnedPaths } from "../util/pinned"
 import { DialogSelect } from "../ui/dialog-select"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
@@ -14,7 +14,7 @@ export function DialogPinnedFiles(props: { session: string }) {
   const toast = useToast()
   const session = createMemo(() => sync.session.get(props.session))
   const options = createMemo(() =>
-    Pinned.list(session()?.metadata).map((file) => ({
+    pinnedPaths(session()?.metadata).map((file) => ({
       title: file,
       value: file,
       description: "select to unpin",
