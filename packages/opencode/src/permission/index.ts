@@ -26,15 +26,14 @@ interface State {
 }
 
 export function evaluate(permission: string, pattern: string, ...rulesets: PermissionV1.Ruleset[]): PermissionV1.Rule {
-  return (
-    rulesets
-      .flat()
-      .findLast((rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern)) ?? {
-      action: "ask",
-      permission,
-      pattern: "*",
-    }
-  )
+  const rules = rulesets
+    .flat()
+    .filter((rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern))
+  const last = rules.at(-1) ?? { action: "ask", permission, pattern: "*" }
+  // A catch-all allow only fills gaps. It must not undo a deny aimed at this specific command, wherever it appears.
+  if (last.action !== "allow" || last.pattern !== "*") return last
+  const specific = rules.findLast((rule) => rule.pattern !== "*")
+  return specific?.action === "deny" ? specific : last
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
