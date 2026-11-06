@@ -18,8 +18,6 @@ import { Instruction } from "./instruction"
 import { Plugin } from "../plugin"
 import { MAX_STEPS_PROMPT } from "@opencode-ai/core/session/runner/max-steps"
 import { MAX_COST_PROMPT } from "@opencode-ai/core/session/runner/max-cost"
-import { WARN_COST_PROMPT } from "@opencode-ai/core/session/runner/warn-cost"
-import { shouldHalt, shouldWarn } from "@opencode-ai/core/session/max-cost-logic"
 import { ToolRegistry } from "@/tool/registry"
 import { MCP } from "../mcp"
 import { LSP } from "@/lsp/lsp"
@@ -1184,40 +1182,7 @@ const layer = Layer.effect(
           const freshSession = yield* sessions.get(sessionID).pipe(Effect.orDie)
           const override = freshSession.metadata?.maxCost
           const maxCost = typeof override === "number" ? override : (agent.maxCost ?? Infinity)
-          const isCostExceeded = shouldHalt(freshSession.cost ?? 0, maxCost)
-          const alreadyWarned = freshSession.metadata?.["costWarned90"] === true
-
-          if (shouldWarn(freshSession.cost ?? 0, maxCost, alreadyWarned)) {
-            yield* sessions.setMetadata({
-              sessionID,
-              metadata: { ...freshSession.metadata, costWarned90: true },
-            })
-            const warnMsg: SessionV1.Assistant = {
-              id: MessageID.ascending(),
-              parentID: lastUser.id,
-              role: "assistant",
-              mode: agent.name,
-              agent: agent.name,
-              variant: lastUser.model.variant,
-              path: { cwd: ctx.directory, root: ctx.worktree },
-              cost: 0,
-              tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-              modelID: model.id,
-              providerID: model.providerID,
-              time: { created: Date.now(), completed: Date.now() },
-              sessionID,
-              finish: "stop",
-            }
-            yield* sessions.updateMessage(warnMsg)
-            yield* sessions.updatePart({
-              id: PartID.ascending(),
-              messageID: warnMsg.id,
-              sessionID,
-              type: "text",
-              text: WARN_COST_PROMPT,
-              synthetic: true,
-            } satisfies SessionV1.TextPart)
-          }
+          const isCostExceeded = (freshSession.cost ?? 0) >= maxCost
           if (isCostExceeded) {
             yield* Effect.logWarning("Session halted: spending cap reached", {
               "session.id": sessionID,

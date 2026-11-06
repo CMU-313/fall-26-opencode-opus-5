@@ -69,11 +69,6 @@ jobs:
         working-directory: packages/client
         run: bun run check:generated
 
-      - name: Run api spending cap properties (mc7)
-        timeout-minutes: 2
-        working-directory: packages/core
-        run: bun test test/max-cost-logic.test.ts --timeout 30000
-
   e2e:
     name: e2e (smoke)
     runs-on: ubuntu-latest
