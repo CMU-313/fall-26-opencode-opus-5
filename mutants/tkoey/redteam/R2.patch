@@ -1,0 +1,24 @@
+diff --git a/packages/core/src/label.ts b/packages/core/src/label.ts
+index 0c2c4a6..d4c8d7f 100644
+--- a/packages/core/src/label.ts
++++ b/packages/core/src/label.ts
+@@ -242,6 +242,19 @@ const layer = Layer.effect(
+         .pipe(Effect.orDie)
+       // The row can only disappear here if another caller deleted it between the read and the write.
+       if (!row) return yield* new NotFoundError({ id })
++      if (parentID !== null && parentID !== current.parent_id) {
++        yield* db
++          .update(SessionTable)
++          .set({ time_updated: Date.now() })
++          .where(
++            inArray(
++              SessionTable.id,
++              db.select({ id: SessionLabelTable.session_id }).from(SessionLabelTable).where(eq(SessionLabelTable.label_id, id)),
++            ),
++          )
++          .run()
++          .pipe(Effect.orDie)
++      }
+       return fromRow(row)
+     })
+ 

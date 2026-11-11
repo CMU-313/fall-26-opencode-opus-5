@@ -1,0 +1,22 @@
+diff --git a/packages/core/src/label.ts b/packages/core/src/label.ts
+index 0c2c4a6..162ce71 100644
+--- a/packages/core/src/label.ts
++++ b/packages/core/src/label.ts
+@@ -248,6 +248,17 @@ const layer = Layer.effect(
+     const remove = Effect.fn("Label.remove")(function* (id: ID) {
+       yield* requireRow(id)
+       const ids = yield* subtree(id)
++      const sessions = yield* db
++        .select({ id: SessionLabelTable.session_id })
++        .from(SessionLabelTable)
++        .where(inArray(SessionLabelTable.label_id, ids))
++        .all()
++        .pipe(Effect.orDie)
++      yield* db
++        .delete(SessionLabelTable)
++        .where(inArray(SessionLabelTable.session_id, sessions.map((session) => session.id)))
++        .run()
++        .pipe(Effect.orDie)
+       // A single DELETE statement satisfies the self-referencing foreign key,
+       // because SQLite checks it once the whole statement has run.
+       yield* db.delete(LabelTable).where(inArray(LabelTable.id, ids)).run().pipe(Effect.orDie)
