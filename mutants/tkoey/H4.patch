@@ -1,0 +1,12 @@
+diff --git a/packages/opencode/src/session/pinned.ts b/packages/opencode/src/session/pinned.ts
+--- a/packages/opencode/src/session/pinned.ts
++++ b/packages/opencode/src/session/pinned.ts
+@@ -36,7 +36,7 @@
+       continue
+     }
+     used += file.tokens
+-    lines.push(`<pinned-file path="${file.path}">\n${file.content}\n</pinned-file>`)
++    lines.push(`<pinned-file path="${file.path}">\n${file.content.trim()}\n</pinned-file>`)
+   }
+   return lines.join("\n")
+ }
