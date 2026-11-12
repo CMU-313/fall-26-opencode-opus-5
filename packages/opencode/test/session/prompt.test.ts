@@ -2792,7 +2792,7 @@ const pinnedTurn = Effect.fn("test.pinnedTurn")(function* (sessionID: SessionID,
 // within the pinning budget must have their contents included in the next model request.
 // Kind: model/oracle. A map of real file contents is the oracle, compared with
 // the captured HTTP provider request. Nested same-basename paths and empty,
-// Unicode, and multiline contents stay far below this model's 25,000-token budget.
+// Unicode, and multiline contents are mixed with pairs totaling exactly 25,000 tokens.
 it.instance(
   "R4: eligible pinned file contents reach the actual model request (property)",
   () =>
@@ -2802,13 +2802,21 @@ it.instance(
       yield* Effect.promise(() =>
         fc.assert(
           fc.asyncProperty(
-            fc.array(fc.oneof(fc.string({ maxLength: 200 }), fc.constant(""), fc.constant("日本語\nline two\n")), {
-              minLength: 1,
-              maxLength: 4,
-            }),
-            (contents) =>
+            fc.oneof(
+              fc.array(fc.oneof(fc.string({ maxLength: 200 }), fc.constant(""), fc.constant("日本語\nline two\n")), {
+                minLength: 1,
+                maxLength: 4,
+              }),
+              // The fixture has 100,000 context tokens; pins may use 25%.
+              fc.integer({ min: 1, max: 24_999 }),
+            ),
+            (input) =>
               Effect.runPromiseWith(context)(
                 Effect.gen(function* () {
+                  const contents =
+                    typeof input === "number"
+                      ? ["a".repeat(input * 4), "b".repeat((25_000 - input) * 4)]
+                      : input
                   const files = contents.map((content, index) => ({ path: `property/${index}/config.txt`, content }))
                   yield* Effect.forEach(files, (file) => writeText(path.join(config.dir, file.path), file.content))
                   const sessions = yield* Session.Service
@@ -2819,12 +2827,12 @@ it.instance(
                   const body = yield* pinnedTurn(chat.id, "Inspect the pinned files.")
                   files.forEach((file) => {
                     const block = `<pinned-file path="${file.path}">\n${file.content}\n</pinned-file>`
-                    expect(body).toContain(JSON.stringify(block).slice(1, -1))
+                    expect(body.includes(JSON.stringify(block).slice(1, -1))).toBe(true)
                   })
                 }),
               ),
           ),
-          { numRuns: 100, examples: [[["DEMO_CODE = blue-giraffe-42"]]] },
+          { seed: 42, numRuns: 100, examples: [[["DEMO_CODE = blue-giraffe-42"]]] },
         ),
       )
     }),
