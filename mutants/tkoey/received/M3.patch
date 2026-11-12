@@ -1,0 +1,17 @@
+diff --git a/packages/tui/src/component/prompt/pin.ts b/packages/tui/src/component/prompt/pin.ts
+index 7bc132f..09dd5fe 100644
+--- a/packages/tui/src/component/prompt/pin.ts
++++ b/packages/tui/src/component/prompt/pin.ts
+@@ -52,11 +52,6 @@ export async function runPinCommand(input: {
+   if (command.action === "unpin") {
+     if (!current.includes(file)) return { type: "error", message: `${file} is not pinned` }
+     const files = Pinned.remove(current, file)
+-    const res = await client.session.update({
+-      sessionID: session.id,
+-      metadata: Pinned.withFiles(session.metadata, files),
+-    })
+-    if (res.error) return { type: "error", message: `Failed to unpin ${file}` }
+     return { type: "success", message: `Unpinned ${file}`, files }
+   }
+ 
+
