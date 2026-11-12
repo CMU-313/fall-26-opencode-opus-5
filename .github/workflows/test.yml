@@ -81,6 +81,11 @@ jobs:
         working-directory: packages/opencode
         run: bun test test/session/prompt.test.ts --test-name-pattern '^R4:' --timeout 60000
 
+      - name: Run api spending cap properties (mc7)
+        timeout-minutes: 2
+        working-directory: packages/core
+        run: bun test test/max-cost-logic.test.ts --timeout 30000
+
   e2e:
     name: e2e (smoke)
     runs-on: ubuntu-latest

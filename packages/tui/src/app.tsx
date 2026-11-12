@@ -87,6 +87,7 @@ import { win32DisableProcessedInput, win32FlushInputBuffer } from "./terminal-wi
 import { destroyRenderer } from "./util/renderer"
 import { cliErrorMessage, errorFormat } from "./util/error"
 import { DialogSessionMaxCost } from "./component/dialog-session-max-cost"
+import { revertMaxCost } from "@opencode-ai/core/session/max-cost-logic"
 
 registerOpencodeSpinner()
 
@@ -603,6 +604,28 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
           if (route.data.type !== "session") return
           const sessionID = route.data.sessionID
           dialog.replace(() => <DialogSessionMaxCost sessionID={sessionID} />)
+        },
+      },
+      {
+        name: "session.prev_max_cost",
+        title: "Revert to previous spending limit",
+        category: "Session",
+        slashName: "prevmaxcost",
+        enabled: () => route.data.type === "session",
+        run: () => {
+          if (route.data.type !== "session") return
+          const sessionID = route.data.sessionID
+          const meta = sync.session.get(sessionID)?.metadata ?? {}
+          const reverted = revertMaxCost(meta)
+          if (!reverted.ok) {
+            toast.show({ message: "No previous spending limit to revert to", variant: "error" })
+            return
+          }
+          void sdk.client.session.update({
+            sessionID,
+            metadata: { ...meta, maxCost: reverted.maxCost, previousMaxCost: reverted.previousMaxCost },
+          })
+          toast.show({ message: `Spending limit reverted to $${reverted.maxCost}`, variant: "info" })    
         },
       },
       {
