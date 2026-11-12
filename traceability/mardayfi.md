@@ -71,3 +71,15 @@ Local verification:
 - These files were run one at a time. The full package suite was not run locally, so PR CI is the check for it.
 
 The `opencode` test script uses `--only-failures`, which hides passing tests, so `.github/workflows/test.yml` has a step that runs the property file directly. That makes each property appear in the PR test log.
+
+## Hand-written mutants
+
+Each mutant is a patch in [`mutants/mardayfi/`](../mutants/mardayfi/). Predictions were written and committed before any mutant was run. A mutant is killed when at least one property in [`permission.property.test.ts`](../packages/opencode/test/permission/permission.property.test.ts) fails with the patch applied.
+
+| ID | Requirement targeted | Change | Predicted killer | Actual result |
+|---|---|---|---|---|
+| H1 | R2 | `permission/index.ts`: `evaluate()` takes `rules[0]` instead of `rules.at(-1)`, so the first matching rule decides instead of the last. | R2 property. Swapping two matching rules would no longer change the decision. | Pending |
+| H2 | R4 | `permission/index.ts`: the catch-all check looks only at the rule just before the catch-all (`rules.at(-2)`) instead of the last specific rule. `{"rm *": "deny", "*": "ask"}` followed by `"*": "allow"` now allows `rm -rf build`. | None: should survive. The R4 generator only ever puts the deny and the catch-all next to each other, so the rule before the catch-all is always the deny. | Pending |
+| H3 | R5 | `permission/index.ts`: when no rules are configured at all, the fallback is allow instead of ask. | R5 property. Its generator can produce an empty config, and then an unmatched command gives allow. | Pending |
+| H4 | R1 | `core/util/wildcard.ts`: compiled patterns are cached with the `g` flag. `RegExp.test` then keeps `lastIndex` between calls, so a repeated check of the same command can flip between match and no match. | R1 property. It checks the same commands repeatedly, so the second check would not match the first. | Pending |
+| H5 | R8 | `permission/index.ts`: in `ask()`, an allowed part of a combined command returns early instead of continuing, so `git status && rm -rf build` is never checked past `git status`. | None among the properties: R8 has no property, and the properties call `evaluate()`, not `ask()`. The older `ask` tests in `next.test.ts` may still catch it. | Pending |

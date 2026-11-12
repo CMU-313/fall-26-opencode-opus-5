@@ -1,0 +1,13 @@
+diff --git a/packages/opencode/src/permission/index.ts b/packages/opencode/src/permission/index.ts
+index 0094864..818e60a 100644
+--- a/packages/opencode/src/permission/index.ts
++++ b/packages/opencode/src/permission/index.ts
+@@ -32,7 +32,7 @@ export function evaluate(permission: string, pattern: string, ...rulesets: Permi
+   const last = rules.at(-1) ?? { action: "ask", permission, pattern: "*" }
+   // A catch-all allow only fills gaps. It must not undo a deny aimed at this specific command, wherever it appears.
+   if (last.action !== "allow" || last.pattern !== "*") return last
+-  const specific = rules.findLast((rule) => rule.pattern !== "*")
++  const specific = rules.at(-2)
+   return specific?.action === "deny" ? specific : last
+ }
+ 
