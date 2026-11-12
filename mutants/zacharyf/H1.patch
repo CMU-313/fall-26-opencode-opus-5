@@ -1,0 +1,13 @@
+diff --git a/packages/tui/src/component/prompt/pin.ts b/packages/tui/src/component/prompt/pin.ts
+index f84bb33..f1e3c7e 100644
+--- a/packages/tui/src/component/prompt/pin.ts
++++ b/packages/tui/src/component/prompt/pin.ts
+@@ -96,7 +96,7 @@ export async function runPinCommand(input: {
+   if (res.error) return { type: "error", message: `Failed to pin ${file}` }
+   // Gitignored files (often secrets like .env) are still pinned, but the user is warned.
+   const warnings: string[] = []
+-  if (entry.ignored) warnings.push(`${file} matches .gitignore`)
++  if (false) warnings.push(`${file} matches .gitignore`)
+   if (bounds.tokens > bounds.limit * 0.8) {
+     warnings.push(`Pinned files use ~${bounds.tokens.toLocaleString()} of ${bounds.limit.toLocaleString()} tokens`)
+   }

@@ -1,0 +1,13 @@
+diff --git a/packages/core/src/util/pinned.ts b/packages/core/src/util/pinned.ts
+index 81aa572..314cb22 100644
+--- a/packages/core/src/util/pinned.ts
++++ b/packages/core/src/util/pinned.ts
+@@ -30,7 +30,7 @@ export function add(files: readonly string[], file: string): string[] {
+ }
+ 
+ export function remove(files: readonly string[], file: string): string[] {
+-  const target = normalize(file)
++  const target = file
+   return files.filter((item) => item !== target)
+ }
+ 
