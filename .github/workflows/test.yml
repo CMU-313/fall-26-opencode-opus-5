@@ -69,6 +69,13 @@ jobs:
         working-directory: packages/client
         run: bun run check:generated
 
+      # The package test script uses --only-failures, which hides passing tests.
+      # Run these explicitly so the log shows each permission property passing.
+      - name: Run permission properties
+        timeout-minutes: 2
+        working-directory: packages/opencode
+        run: bun test test/permission/permission.property.test.ts test/permission/opencode-r4.property.test.ts --timeout 30000
+
       # Package test scripts use --only-failures, which hides passing tests. Run the
       # file-pinning property tests by name so the log lists each one that passed.
       - name: Run file-pinning properties (zacharyf, TUI)

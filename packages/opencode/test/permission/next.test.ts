@@ -295,9 +295,26 @@ test("evaluate - last matching rule wins", () => {
   expect(result.action).toBe("deny")
 })
 
-test("evaluate - last matching rule wins (wildcard after specific)", () => {
+test("evaluate - catch-all allow does not override a specific deny", () => {
   const result = Permission.evaluate("bash", "rm", [
     { permission: "bash", pattern: "rm", action: "deny" },
+    { permission: "bash", pattern: "*", action: "allow" },
+  ])
+  expect(result.action).toBe("deny")
+})
+
+test("evaluate - catch-all allow does not undo a specific allow after a deny", () => {
+  const result = Permission.evaluate("bash", "rm foo", [
+    { permission: "bash", pattern: "rm *", action: "deny" },
+    { permission: "bash", pattern: "rm foo", action: "allow" },
+    { permission: "bash", pattern: "*", action: "allow" },
+  ])
+  expect(result.action).toBe("allow")
+})
+
+test("evaluate - catch-all allow still overrides a catch-all deny", () => {
+  const result = Permission.evaluate("bash", "rm", [
+    { permission: "bash", pattern: "*", action: "deny" },
     { permission: "bash", pattern: "*", action: "allow" },
   ])
   expect(result.action).toBe("allow")
@@ -372,12 +389,12 @@ test("evaluate - exact match at end wins over earlier wildcard", () => {
   expect(result.action).toBe("deny")
 })
 
-test("evaluate - wildcard at end overrides earlier exact match", () => {
+test("evaluate - wildcard at end does not override earlier exact deny", () => {
   const result = Permission.evaluate("bash", "/bin/rm", [
     { permission: "bash", pattern: "/bin/rm", action: "deny" },
     { permission: "bash", pattern: "*", action: "allow" },
   ])
-  expect(result.action).toBe("allow")
+  expect(result.action).toBe("deny")
 })
 
 // wildcard permission tests
