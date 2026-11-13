@@ -79,3 +79,26 @@ TODO (Zach): write this in your own words. Facts:
 - **Hand-written mutants Stryker never generated:** H2 (adds a new `&& !name.startsWith(".")` condition; Stryker only replaces or removes code, it doesn't add conditions), H3 (`===` → `endsWith`; no mutator does this), H4 (deletes a single `push` statement but keeps the `continue`; Stryker's nearest is `BlockStatement {}` on the whole `if`, which is killed but behaves differently), H5 (adds a cache; a multi-line semantic change), H6 and H7 (in `core/util/pinned.ts`, outside both mutate scopes). **H1 was generated:** `pin.ts:99` `if (entry.ignored)` → `if (false)`, killed.
 - **Stryker survivors I hadn't thought of:** for example, the unpin branch (whole requirement path untested at TUI level), the `res.error` save-failure branches, the 80% token warning boundary (`>` → `>=`, `* 0.8` → `/ 0.8`), the `..`/absolute outside-project guard in `load`, a pin replaced by a directory (`Effect.catch` → `() => undefined`, which crashes the whole send), and the header/newline formatting of the request.
 - **Scores:** hand-written killed 6/7 before strengthening. Stryker killed 76/161 (47.2%).
+
+## Agent failure case
+
+- **Prompt to opencode** (dev build, TUI): "In `packages/tui/src/component/prompt/pin.ts`, `runPinCommand` implements `/pin`. Requirement R2: pinning a file that matches .gitignore succeeds but shows a warning, and pinning a file that isn't ignored shows no warning. Write a fast-check property-based test for R2 in `packages/tui/test/prompt/r2.opencode.property.test.ts`, using `bun:test` and a fake `OpencodeClient`. Write your own test; don't read or reuse `packages/tui/test/prompt/pin.property.test.ts`. Run it with `bun test test/prompt/r2.opencode.property.test.ts` from `packages/tui` and make sure it passes."
+- **Transcript:** [screenshot](../mutants/zacharyf/agent-case.png): session `ses_e2dc369d1ffehWs32lo559orhr`, model ERNIE-5.5-Flash-Preview (free, via OpenRouter), 2026-11-13T00:09Z. It shows opencode running the test (1 pass, 300 `expect()` calls) and its summary. Share link: https://opncd.ai/share/o559orhr (it returned HTTP 410 Gone when fetched later).
+- **opencode's property:** the first test in [`r2.opencode.property.test.ts`](../packages/tui/test/prompt/r2.opencode.property.test.ts), unchanged. It passes on the real code and kills H1.
+- **Surviving mutants:**
+  - [H2](../mutants/zacharyf/H2.patch): dotfiles are treated as not in the project.
+  - [H8](../mutants/zacharyf/H8.patch): an ignored file returns "Pinned … matches .gitignore", but is never saved to the session. H8 was written for this case after reading opencode's property, so it has no prediction.
+- **Why the property was weak:** TODO (Zach). Facts:
+  - Its file-name generator is `segment + ("" | .ts | .md | .json | .min.js)`, which never produces a dotfile, so `.env` (the R2 acceptance example) is never tried.
+  - Its oracle checks only `result.type`, the message, and `result.files` containing the path. It never checks the `session.update` metadata the fake records (`updates` is created but never read).
+  - Its fake `file.list` returns the same single file for every directory.
+- **Strengthened version:** the second test in the same file. It adds 5 dotfiles to the generator and checks the exact result and that `session.update` saved `[pinned]`.
+- **Evidence** ([`mutants/zacharyf/agent-case-evidence.txt`](../mutants/zacharyf/agent-case-evidence.txt), seed 20261113 from opencode's file):
+
+| Code | opencode's property | Strengthened |
+|---|---|---|
+| Real code | pass | pass |
+| H2 | **pass** (survives) | fail, `[".env",false,""]` |
+| H8 | **pass** (survives) | fail, `[".env",true,""]` |
+
+- **Same gap in my own R2:** it killed H8 only because the warning text didn't match, and it also didn't check the save. I added `expect(updates).toEqual([{ pinnedFiles: [...current, file] }])` to it.

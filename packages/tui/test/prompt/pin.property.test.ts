@@ -172,6 +172,8 @@ describe("pin command properties", () => {
             files: [...current, file],
           })
           expect(result.message.includes("matches .gitignore")).toBe(ignored)
+          // The pin is saved whether or not it warns.
+          expect(updates).toEqual([{ pinnedFiles: [...current, file] }])
         },
       ),
     )
