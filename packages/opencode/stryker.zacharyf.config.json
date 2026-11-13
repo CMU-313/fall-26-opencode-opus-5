@@ -1,0 +1,11 @@
+{
+  "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "command",
+  "commandRunner": { "command": "bun test test/session/pinned.property.test.ts" },
+  "mutate": ["src/session/pinned.ts:22-58"],
+  "coverageAnalysis": "off",
+  "concurrency": 4,
+  "reporters": ["html", "json", "clear-text", "progress"],
+  "htmlReporter": { "fileName": "reports/mutation/mutation.html" },
+  "tempDirName": ".stryker-tmp"
+}

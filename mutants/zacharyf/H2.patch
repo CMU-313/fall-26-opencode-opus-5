@@ -1,0 +1,13 @@
+diff --git a/packages/tui/src/component/prompt/pin.ts b/packages/tui/src/component/prompt/pin.ts
+index f84bb33..ec26c93 100644
+--- a/packages/tui/src/component/prompt/pin.ts
++++ b/packages/tui/src/component/prompt/pin.ts
+@@ -24,7 +24,7 @@ async function lookup(client: OpencodeClient, file: string) {
+   const res = await client.file.list({ path: dir === "." ? "" : dir })
+   if (res.error || !res.data) return undefined
+   const name = path.posix.basename(file)
+-  return res.data.find((item) => item.name === name && item.type === "file")
++  return res.data.find((item) => item.name === name && item.type === "file" && !name.startsWith("."))
+ }
+ 
+ // Pinned paths that are no longer files in the project, checked when a message is sent.

@@ -1,0 +1,12 @@
+diff --git a/packages/opencode/src/session/pinned.ts b/packages/opencode/src/session/pinned.ts
+index b633ba0..5d67fab 100644
+--- a/packages/opencode/src/session/pinned.ts
++++ b/packages/opencode/src/session/pinned.ts
+@@ -26,7 +26,6 @@ export function render(files: readonly Loaded[], max: number) {
+   let used = 0
+   for (const file of files) {
+     if (file.content === undefined) {
+-      lines.push(`<pinned-file path="${file.path}" missing="true">File could not be read.</pinned-file>`)
+       continue
+     }
+     if (used + file.tokens > max) {
