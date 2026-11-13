@@ -134,9 +134,41 @@ M3 leaves file bytes unchanged, so it does not violate R1's stated byte-preserva
 
 Normal source passed all three properties before and after testing. Each mutant produced 2 passes and 1 failure; all patches were reversed. The outgoing attack patches in `mutants/tkoey/redteam/` are unchanged.
 
+## Stryker comparison
+
+Both runs use seed `42` and the command runner. Only my TUI properties and R4 run; teammates' properties and the other prompt tests are excluded. TUI covers pin/unpin state updates, budgeting, and display sorting; OpenCode covers pinned-content rendering. Configurations are in each package as `stryker.tkoey.config.json`.
+
+Run from the repo root (each command changes to its package before testing):
+
+```sh
+node packages/tui/node_modules/@stryker-mutator/core/bin/stryker.js run packages/tui/stryker.tkoey.config.json
+node packages/opencode/node_modules/@stryker-mutator/core/bin/stryker.js run packages/opencode/stryker.tkoey.config.json
+```
+
+The TUI test-only tsconfig maps the Core pinning import into Stryker's sandbox. Without it, workspace symlinks load the original Core file and give misleading survivors. Unrelated console files, old reports, and temporary sandboxes are excluded from copying.
+
+| Final run | Killed | Timed out | Survived | Raw score | Score excluding equivalent mutants |
+| --- | --- | --- | --- | --- | --- |
+| TUI | 60 | 0 | 22 | 73.17% | 73.17% |
+| OpenCode R4 | 8 | 1 | 10 | 47.37% | 47.37% |
+
+Reports: [TUI HTML](../mutants/tkoey/mutation.html), [R4 HTML](../mutants/tkoey/mutation-opencode.html), plus the corresponding `stryker-tui.json` and `stryker-opencode.json` files. These are local results, not CI results. Stryker counts timeouts as detected mutants; R4 mutant 2 timed out, so its result is not claimed as an assertion-based kill. With that timeout counted as undetected, R4's score is 42.11%.
+
+### Comparison and strengthening
+
+- Stryker generated H1 (TUI mutant 81), H2 (TUI 35), and H5 (R4 12). It did not generate H3's replacement of the full pin list with `[file]`, or H4's inserted `.trim()` call: those require feature-specific edits rather than its standard operators.
+- The TUI run initially killed 58/82 mutants (70.73%). Two survivors showed that `not.toBe("error")` also accepted missing or empty result types. R1 now requires `success`, and R5 explicitly accepts only `success` or `warning`; mutants 64 and 65 are now killed, giving 60/82.
+- Unexpected survivors include TUI 40 (treat every file read as text) and 43 (remove the missing-data guard). These are plausible faults for binary or missing files, which my generators do not include. Other survivors change failed-save handling or unpin messages; the current properties do not cover those responses.
+- R4 survivors remove missing-file handling, over-budget checks/accounting, the introductory text, or separators between blocks. The property checks complete blocks for readable files whose total fits the budget; it does not specify those other behaviors. No survivor is claimed equivalent, so the equivalent-excluded scores stay unchanged. These are remaining coverage gaps, not passing evidence for the changed behavior.
+- Manual mutants made it easy to express the ignored-existing-pins bug and whitespace loss. Stryker explored mechanical changes I had not considered, including invalid return objects and optional chaining. Both approaches found gaps: H5 exposed the missing boundary generator, while the TUI run exposed the weak result-type assertion.
+
+### Merge verification
+
+The merge was completed in `d2e24de`. Both students' TUI properties are preserved in separate files, and CI runs both plus my R4 property. The seven TUI properties and R4 passed on merged source; both package typechecks passed. Copilot's reduction of R4 from 100 runs to 10 was undone. H3's patch context was refreshed after the lookup helper changed; its fault is unchanged.
+
 ## Submission checklist
 
-- Push the final reviewed commit and open an individual PR to `main`; leave it unmerged.
-- Obtain teammate review.
+- Push P5 commits to the existing [PR #20](https://github.com/CMU-313/fall-26-opencode-opus-5/pull/20).
+- Obtain teammate approval and merge into `main` with the properties passing in CI.
 - Confirm the passing GitHub Actions `test` run logs all four properties, including the TUI package.
-- Submit commit-pinned links to this file and both test files, the PR link, passing test-run link, and final commit SHA.
+- Submit commit-pinned links to the required files and sections, the PR link, and merge SHA. Submit the nine retrospective answers separately.

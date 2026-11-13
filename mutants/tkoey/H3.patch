@@ -1,8 +1,8 @@
 diff --git a/packages/tui/src/component/prompt/pin.ts b/packages/tui/src/component/prompt/pin.ts
 --- a/packages/tui/src/component/prompt/pin.ts
 +++ b/packages/tui/src/component/prompt/pin.ts
-@@ -67,7 +67,7 @@
-   if (!(await isFile(input.client, file))) return { type: "error", message: `${file} is not a file in this project` }
+@@ -81,7 +81,7 @@
+   if (!entry) return { type: "error", message: `${file} is not a file in this project` }
  
    const files = Pinned.add(current, file)
 -  const bounds = Pinned.check(await tokens(client, files), Pinned.limit(input.model))

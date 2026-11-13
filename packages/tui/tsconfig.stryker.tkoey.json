@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@opencode-ai/core/util/pinned": ["../core/src/util/pinned.ts"]
+    }
+  }
+}

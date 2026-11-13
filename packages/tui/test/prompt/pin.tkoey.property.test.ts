@@ -36,7 +36,7 @@ test("R1: pin and unpin preserve file bytes after each command", async () => {
             session: fixture.session,
             command: { action, path: candidate },
           })
-          expect(result.type).not.toBe("error")
+          expect(result.type).toBe("success")
           expect(
             await Promise.all(files.map((file) => Bun.file(path.join(fixture.session.directory, file)).bytes())),
           ).toEqual(before)
@@ -105,7 +105,7 @@ test("R5: command accepts within budget and rejects over budget without changing
           expect(fixture.updates).toHaveLength(0)
           continue
         }
-        expect(result.type).not.toBe("error")
+        expect(["success", "warning"]).toContain(result.type)
         expect(Pinned.list(fixture.session.metadata)).toEqual(["existing.txt", "candidate.txt"])
         expect(fixture.updates).toHaveLength(1)
       }
