@@ -1,0 +1,13 @@
+diff --git a/packages/opencode/src/session/pinned.ts b/packages/opencode/src/session/pinned.ts
+index b633ba0..76f782a 100644
+--- a/packages/opencode/src/session/pinned.ts
++++ b/packages/opencode/src/session/pinned.ts
+@@ -24,7 +24,7 @@ export function render(files: readonly Loaded[], max: number) {
+     "The user has pinned the following files. Their current contents are included on every turn; treat them as already read.",
+   ]
+   let used = 0
+-  for (const file of files) {
++  for (const file of files.slice(0, 1)) {
+     if (file.content === undefined) {
+       lines.push(`<pinned-file path="${file.path}" missing="true">File could not be read.</pinned-file>`)
+       continue

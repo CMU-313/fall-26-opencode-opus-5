@@ -113,6 +113,8 @@ describe("SessionPinned property-based tests", () => {
 
           expect(first).toContain(originalBlock)
           expect(second).toContain(originalBlock)
+          const newBlock = `<pinned-file path="${otherFile}">\n${otherContent}\n</pinned-file>`
+          expect(second).toContain(newBlock)
         },
       ),
     )
