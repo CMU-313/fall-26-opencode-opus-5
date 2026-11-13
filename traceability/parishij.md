@@ -71,3 +71,59 @@ The surviving mutants exposed gaps in the current properties, particularly aroun
 The hand-written mutants targeted specific behaviors described by the requirements, so all five were detected. Stryker generated a broader range of mutations, including changes to branches and error-handling logic that the current properties do not exercise.
 
 This shows that killing targeted mutants does not guarantee comprehensive test coverage. Additional properties should exercise missing files, invalid paths, token-budget boundaries, and file-loading behavior.
+
+## Agent failure case
+
+### OpenCode-generated property
+
+I asked OpenCode to generate a property-based test for R8, checking that adding a second pinned file within the token budget preserves the original file's rendered content.
+
+**Original prompt excerpt:**
+> I am testing the file-pinning feature. Requirement R8 says that adding another pinned file within the token budget must preserve the original pinned file's rendered content.
+>
+> Please write a property-based test for R8 using fast-check and Bun, following the existing test conventions in `packages/opencode/test/session/`.
+>
+> Use generated file paths and contents. Check that adding a second pinned file preserves the original file's content in the rendered context.
+>
+> Save your test in `packages/opencode/test/session/pinned.agent.property.test.ts`. Do not modify any other files.
+
+**OpenCode response excerpt:**
+> Added `packages/opencode/test/session/pinned.agent.property.test.ts`.
+>
+> Generates file paths, contents, and token costs with fast-check.
+>
+> Verifies adding a second file within budget preserves the original rendered content.
+>
+> Targeted test passes: 1 pass, 300 expect() calls.
+
+### Surviving mutant
+
+H2 (`mutants/parishij/H2.patch`) changes `remove()` in `packages/core/src/util/pinned.ts` to return the original pinned list unchanged instead of filtering out the removed file.
+
+When I applied H2 and ran the original OpenCode-generated property, the test still passed: **1 pass, 0 fail, 300 assertions**.
+
+### Why the property was too weak
+
+The generated property only checked R8's rendering behavior when adding another pinned file. It never called `remove()` or checked whether unpinning actually removes a file. Therefore, H2 survived even though it breaks R2.
+
+This is a coverage gap rather than an incorrect assertion: OpenCode correctly tested the requested R8 behavior, but the generated test alone was insufficient to catch the unpinning mutation.
+
+### Strengthened property and evidence
+
+I asked OpenCode to strengthen the test by adding a property that checks whether pinning and then unpinning a file removes it from the pinned list, while keeping the original R8 property.
+
+The strengthened test passed on the unmutated implementation: **2 pass, 0 fail, 400 assertions**.
+
+After applying H2, the strengthened test produced:
+
+- **1 pass, 1 fail**
+- Failed property: `pinning and then unpinning a file removes it from the pinned list`
+- Counterexample: `["0.ts"]`
+
+Therefore, the strengthened property **killed H2**, demonstrating that explicitly checking unpinning behavior closes the coverage gap.
+
+**Test file:** `packages/opencode/test/session/pinned.agent.property.test.ts`
+
+**OpenCode sessions:**
+- Initial property: `ses_e2cc646f5ffeHAZYTVj8bT32Ke`
+- Strengthening: `ses_e2cc35afaffeKysmQDvCM2DEby`
