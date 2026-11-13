@@ -1,0 +1,15 @@
+diff --git a/packages/tui/src/component/prompt/pin.ts b/packages/tui/src/component/prompt/pin.ts
+index 7bc132f..16b6240 100644
+--- a/packages/tui/src/component/prompt/pin.ts
++++ b/packages/tui/src/component/prompt/pin.ts
+@@ -33,7 +33,7 @@ async function tokens(client: OpencodeClient, files: readonly string[]) {
+       return res.data?.type === "text" ? Token.estimate(res.data.content) : 0
+     }),
+   )
+-  return sizes.reduce((sum, size) => sum + size, 0)
++  return sizes.reduce((sum, size) => size, 0)
+ }
+ 
+ export async function runPinCommand(input: {
+
+

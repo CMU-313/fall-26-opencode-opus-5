@@ -1,0 +1,12 @@
+diff --git a/packages/opencode/src/session/pinned.ts b/packages/opencode/src/session/pinned.ts
+--- a/packages/opencode/src/session/pinned.ts
++++ b/packages/opencode/src/session/pinned.ts
+@@ -29,7 +29,7 @@
+       lines.push(`<pinned-file path="${file.path}" missing="true">File could not be read.</pinned-file>`)
+       continue
+     }
+-    if (used + file.tokens > max) {
++    if (used + file.tokens >= max) {
+       lines.push(
+         `<pinned-file path="${file.path}" omitted="true">Omitted: pinned files exceed the ${max} token limit. Read it with the read tool if needed.</pinned-file>`,
+       )

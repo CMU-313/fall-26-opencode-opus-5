@@ -76,6 +76,16 @@ jobs:
         working-directory: packages/tui
         run: bun test test/prompt/pin.property.test.ts --timeout 30000
 
+      - name: Run file-pinning properties (tkoey, TUI)
+        timeout-minutes: 2
+        working-directory: packages/tui
+        run: bun test test/prompt/pin.tkoey.property.test.ts --timeout 30000
+
+      - name: Run model-request file-pinning property (tkoey, R4)
+        timeout-minutes: 2
+        working-directory: packages/opencode
+        run: bun test test/session/prompt.test.ts --test-name-pattern '^R4:' --timeout 60000
+
       - name: Run file-pinning properties (zacharyf, opencode)
         timeout-minutes: 2
         working-directory: packages/opencode

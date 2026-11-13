@@ -1,0 +1,31 @@
+{
+  "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "cd packages/opencode && bun test test/session/prompt.test.ts --test-name-pattern '^R4:' --timeout 60000"
+  },
+  "mutate": [
+    "packages/opencode/src/session/pinned.ts:22-42"
+  ],
+  "coverageAnalysis": "off",
+  "concurrency": 1,
+  "dryRunTimeoutMinutes": 3,
+  "reporters": [
+    "html",
+    "json",
+    "clear-text",
+    "progress"
+  ],
+  "htmlReporter": {
+    "fileName": "mutants/tkoey/mutation-opencode.html"
+  },
+  "tempDirName": ".stryker-tmp/tkoey-opencode",
+  "jsonReporter": {
+    "fileName": "mutants/tkoey/stryker-opencode.json"
+  },
+  "ignorePatterns": [
+    ".stryker-tmp/**",
+    "mutants/**",
+    "packages/console/**"
+  ]
+}

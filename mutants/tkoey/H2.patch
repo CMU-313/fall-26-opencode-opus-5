@@ -1,0 +1,12 @@
+diff --git a/packages/core/src/util/pinned.ts b/packages/core/src/util/pinned.ts
+--- a/packages/core/src/util/pinned.ts
++++ b/packages/core/src/util/pinned.ts
+@@ -48,7 +48,7 @@
+ }
+ 
+ export function check(tokens: number, max: number): Bounds {
+-  return { ok: tokens <= max, tokens, limit: max }
++  return { ok: tokens < max, tokens, limit: max }
+ }
+ 
+ export * as Pinned from "./pinned"

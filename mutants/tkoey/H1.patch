@@ -1,0 +1,10 @@
+diff --git a/packages/tui/src/util/pinned.ts b/packages/tui/src/util/pinned.ts
+--- a/packages/tui/src/util/pinned.ts
++++ b/packages/tui/src/util/pinned.ts
+@@ -2,5 +2,5 @@
+ 
+ // Sort only the presentation: stored order also controls model-context budgeting.
+ export function pinnedPaths(metadata: Record<string, unknown> | undefined) {
+-  return Pinned.list(metadata).sort()
++  return Pinned.list(metadata)
+ }

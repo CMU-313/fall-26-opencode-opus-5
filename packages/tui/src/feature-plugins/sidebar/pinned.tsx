@@ -1,14 +1,14 @@
 import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
 import type { BuiltinTuiPlugin } from "../builtins"
 import { createMemo, For, Show } from "solid-js"
-import { Pinned } from "@opencode-ai/core/util/pinned"
+import { pinnedPaths } from "../../util/pinned"
 import { Locale } from "../../util/locale"
 
 const id = "internal:sidebar-pinned"
 
 function View(props: { api: TuiPluginApi; session_id: string }) {
   const theme = () => props.api.theme.current
-  const list = createMemo(() => Pinned.list(props.api.state.session.get(props.session_id)?.metadata))
+  const list = createMemo(() => pinnedPaths(props.api.state.session.get(props.session_id)?.metadata))
 
   return (
     <Show when={list().length > 0}>

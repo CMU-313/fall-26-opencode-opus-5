@@ -1,0 +1,34 @@
+{
+  "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "cd packages/tui && bun test --tsconfig-override ./tsconfig.stryker.tkoey.json test/prompt/pin.tkoey.property.test.ts --timeout 30000"
+  },
+  "mutate": [
+    "packages/tui/src/util/pinned.ts",
+    "packages/tui/src/component/prompt/pin.ts:42-50",
+    "packages/tui/src/component/prompt/pin.ts:65-74",
+    "packages/tui/src/component/prompt/pin.ts:83-96",
+    "packages/core/src/util/pinned.ts:25-52"
+  ],
+  "coverageAnalysis": "off",
+  "concurrency": 2,
+  "reporters": [
+    "html",
+    "json",
+    "clear-text",
+    "progress"
+  ],
+  "htmlReporter": {
+    "fileName": "mutants/tkoey/mutation.html"
+  },
+  "tempDirName": ".stryker-tmp/tkoey-tui",
+  "jsonReporter": {
+    "fileName": "mutants/tkoey/stryker-tui.json"
+  },
+  "ignorePatterns": [
+    ".stryker-tmp/**",
+    "mutants/**",
+    "packages/console/**"
+  ]
+}
