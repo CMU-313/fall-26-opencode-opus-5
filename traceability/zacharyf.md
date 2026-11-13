@@ -70,15 +70,14 @@ All of them were killed by strengthening properties. No example tests were added
 
 | Mutant | Argument |
 |---|---|
-| tui `pin.ts:25` LogicalOperator `res.error \|\| !res.data` → `res.error && !res.data` | TODO (Zach). Facts: the SDK client returns `{ error }` with no `data` on failure, and `{ data }` on success. In both cases the two conditions agree. They differ only when there is no error and no data, which the SDK doesn't return. |
-| opencode `session/pinned.ts:44` StringLiteral `Effect.fn("SessionPinned.load")` → `Effect.fn("")` | TODO (Zach). Facts: the string is only the tracing span name. `load`'s return value and errors don't depend on it, and nothing in the request reads it. |
+| tui `pin.ts:25` LogicalOperator `res.error \|\| !res.data` → `res.error && !res.data` | The SDK returns either `{ error }` with no data or `{ data }` with no error, and `\|\|` and `&&` agree on both. They differ only when there is neither, which the SDK never returns. |
+| opencode `session/pinned.ts:44` StringLiteral `Effect.fn("SessionPinned.load")` → `Effect.fn("")` | The string is only the tracing span name. Nothing reads it, so `load`'s result and errors are identical. |
 
 ### Comparison
 
-TODO (Zach): write this in your own words. Facts:
-- **Hand-written mutants Stryker never generated:** H2 (adds a new `&& !name.startsWith(".")` condition; Stryker only replaces or removes code, it doesn't add conditions), H3 (`===` → `endsWith`; no mutator does this), H4 (deletes a single `push` statement but keeps the `continue`; Stryker's nearest is `BlockStatement {}` on the whole `if`, which is killed but behaves differently), H5 (adds a cache; a multi-line semantic change), H6 and H7 (in `core/util/pinned.ts`, outside both mutate scopes). **H1 was generated:** `pin.ts:99` `if (entry.ignored)` → `if (false)`, killed.
-- **Stryker survivors I hadn't thought of:** for example, the unpin branch (whole requirement path untested at TUI level), the `res.error` save-failure branches, the 80% token warning boundary (`>` → `>=`, `* 0.8` → `/ 0.8`), the `..`/absolute outside-project guard in `load`, a pin replaced by a directory (`Effect.catch` → `() => undefined`, which crashes the whole send), and the header/newline formatting of the request.
-- **Scores:** hand-written killed 6/7 before strengthening. Stryker killed 76/161 (47.2%).
+- **Hand-written mutants Stryker never generated:** H2–H5, which add or reshape logic (a new condition, `===` → `endsWith`, a dropped `push`, a cache). Stryker only swaps or deletes single operators and literals. H6–H7 are in `core/util/pinned.ts`, outside both Stryker scopes. Only H1 (`if (false)`) matched a Stryker mutant.
+- **Stryker survivors I wouldn't have thought of:** the whole `/unpin` path, save failures (`res.error`), the 80% token warning boundary, the outside-project guard in `load`, a pin replaced by a directory (which crashed the send), and request formatting (header, newlines).
+- **What each finds:** hand-written mutants test whether the properties catch realistic, requirement-level bugs. Stryker sweeps every branch and literal, which exposed code paths no property ran at all. Hand-written killed 6/7 before strengthening. Stryker killed only 76/161 (47.2%), so Stryker found far more gaps.
 
 ## Agent failure case
 
@@ -88,10 +87,9 @@ TODO (Zach): write this in your own words. Facts:
 - **Surviving mutants:**
   - [H2](../mutants/zacharyf/H2.patch): dotfiles are treated as not in the project.
   - [H8](../mutants/zacharyf/H8.patch): an ignored file returns "Pinned … matches .gitignore", but is never saved to the session. H8 was written for this case after reading opencode's property, so it has no prediction.
-- **Why the property was weak:** TODO (Zach). Facts:
-  - Its file-name generator is `segment + ("" | .ts | .md | .json | .min.js)`, which never produces a dotfile, so `.env` (the R2 acceptance example) is never tried.
-  - Its oracle checks only `result.type`, the message, and `result.files` containing the path. It never checks the `session.update` metadata the fake records (`updates` is created but never read).
-  - Its fake `file.list` returns the same single file for every directory.
+- **Why the property was weak:**
+  - **Generator:** it never makes dotfiles, so `.env`, the main R2 example, is never pinned (H2 survives).
+  - **Oracle:** it checks the returned result but never that the pin was saved, even though its fake records `updates` (H8 survives).
 - **Strengthened version:** the second test in the same file. It adds 5 dotfiles to the generator and checks the exact result and that `session.update` saved `[pinned]`.
 - **Evidence** ([`mutants/zacharyf/agent-case-evidence.txt`](../mutants/zacharyf/agent-case-evidence.txt), seed 20261113 from opencode's file):
 
