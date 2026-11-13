@@ -7,3 +7,7 @@ coverage-html
 .qlty
 packages/sdk/js/tsconfig.tsbuildinfo
 test-results/.last-run.json
+
+# Stryker mutation testing output
+reports/
+.stryker-tmp/

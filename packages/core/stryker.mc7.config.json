@@ -1,0 +1,7 @@
+{
+  "testRunner": "command",
+  "commandRunner": { "command": "bun test test/max-cost-logic.test.ts" },
+  "mutate": ["src/session/max-cost-logic.ts"],
+  "coverageAnalysis": "off",
+  "reporters": ["html", "clear-text", "progress"]
+}

@@ -1,0 +1,12 @@
+diff --git a/packages/core/src/session/max-cost-logic.ts b/packages/core/src/session/max-cost-logic.ts
+index b278a88..95c4141 100644
+--- a/packages/core/src/session/max-cost-logic.ts
++++ b/packages/core/src/session/max-cost-logic.ts
+@@ -30,6 +30,5 @@ export function parseMaxCostInput(raw: string): ParsedMaxCost {
+ export function revertMaxCost(
+   current: { maxCost?: number; previousMaxCost?: number },
+ ): { ok: true; maxCost: number; previousMaxCost: number | undefined } | { ok: false } {
+-  if (current.previousMaxCost === undefined) return { ok: false }
+   return { ok: true, maxCost: current.previousMaxCost, previousMaxCost: current.maxCost }
+ }
+\ No newline at end of file
