@@ -1,0 +1,21 @@
+--- clean
+(pass) pin command properties > R1: existing files can be pinned and other paths are rejected [10.70ms]
+(pass) pin command properties > R2: gitignored files are pinned with a warning, others without [9.74ms]
+(pass) pin command properties > R4: deleted or renamed pins are reported to the user by path [5.69ms]
+(pass) pin command properties > R5: /pin then /unpin restores the pinned set [4.83ms]
+(pass) R2: /pin warns for gitignored files only > ignored files pin with a warning; non-ignored files pin without one [4.24ms]
+(pass) R2 (strengthened): /pin warns for gitignored files only > ignored files, dotfiles included, are saved and warned about; others are saved without a warning [1.55ms]
+ 6 pass
+ 0 fail
+--- H2
+(pass) R2: /pin warns for gitignored files only > ignored files pin with a warning; non-ignored files pin without one [19.32ms]
+Counterexample: [".env",false,""]
+(fail) R2 (strengthened): /pin warns for gitignored files only > ignored files, dotfiles included, are saved and warned about; others are saved without a warning [8.45ms]
+Counterexample: [[".env","a"],[{"tokens":0,"binary":false,"gone":false},{"tokens":0,"binary":false,"gone":false},{"tokens":0,"binary":false,
+(fail) pin command properties > R2: gitignored files are pinned with a warning, others without [10.00ms]
+--- H8
+(pass) R2: /pin warns for gitignored files only > ignored files pin with a warning; non-ignored files pin without one [6.51ms]
+Counterexample: [".env",true,""]
+(fail) R2 (strengthened): /pin warns for gitignored files only > ignored files, dotfiles included, are saved and warned about; others are saved without a warning [1.72ms]
+Counterexample: [["a"],[{"tokens":0,"binary":false,"gone":false},{"tokens":0,"binary":false,"gone":false},{"tokens":0,"binary":false,"gone":
+(fail) pin command properties > R2: gitignored files are pinned with a warning, others without [5.36ms]
