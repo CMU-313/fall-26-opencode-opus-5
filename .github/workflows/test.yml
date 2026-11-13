@@ -69,17 +69,27 @@ jobs:
         working-directory: packages/client
         run: bun run check:generated
 
-      # Package test scripts use --only-failures. Run these explicitly as well
-      # so the P4 submission log identifies every property that passed.
-      - name: Run TUI file-pinning properties (R1, R3, R5)
+      # Package test scripts use --only-failures, which hides passing tests. Run the
+      # file-pinning property tests by name so the log lists each one that passed.
+      - name: Run file-pinning properties (zacharyf, TUI)
         timeout-minutes: 2
         working-directory: packages/tui
         run: bun test test/prompt/pin.property.test.ts --timeout 30000
 
-      - name: Run model-request file-pinning property (R4)
+      - name: Run file-pinning properties (tkoey, TUI)
+        timeout-minutes: 2
+        working-directory: packages/tui
+        run: bun test test/prompt/pin.tkoey.property.test.ts --timeout 30000
+
+      - name: Run model-request file-pinning property (tkoey, R4)
         timeout-minutes: 2
         working-directory: packages/opencode
         run: bun test test/session/prompt.test.ts --test-name-pattern '^R4:' --timeout 60000
+
+      - name: Run file-pinning properties (zacharyf, opencode)
+        timeout-minutes: 2
+        working-directory: packages/opencode
+        run: bun test test/session/pinned.property.test.ts --timeout 30000
 
       - name: Run api spending cap properties (mc7)
         timeout-minutes: 2

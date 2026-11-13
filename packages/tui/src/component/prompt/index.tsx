@@ -56,7 +56,7 @@ import { useTuiConfig } from "../../config"
 import { usePromptWorkspace } from "./workspace"
 import { usePromptMove } from "./move"
 import { readLocalAttachment } from "./local-attachment"
-import { parsePinCommand, runPinCommand } from "./pin"
+import { missingMessage, missingPins, parsePinCommand, runPinCommand } from "./pin"
 import { useLocation } from "../../context/location"
 
 registerOpencodeSpinner()
@@ -1111,6 +1111,12 @@ export function Prompt(props: PromptProps) {
         parts: nonTextParts.filter((x) => x.type === "file"),
       })
     } else {
+      if (workspaceSession) {
+        void missingPins(sdk.client, workspaceSession).then((missing) => {
+          const message = missingMessage(missing)
+          if (message) toast.show({ message, variant: "error" })
+        })
+      }
       move.startSubmit()
       sdk.client.session
         .prompt(
