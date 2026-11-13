@@ -59,6 +59,12 @@ function specificPatterns(input: Command) {
 // the deny and the final allow to prevent mutants that only need to look at
 // the immediately adjacent rule. The property also checks that commands the
 // deny rule does not match are unaffected — they still resolve to "allow".
+//
+// Strengthened after the agent failure case (mutant A1): the final catch-all
+// now gets any action, not only allow. R4's exception is only for a catch-all
+// allow, so a final catch-all ask or deny still decides by the last-match rule
+// (R2). Without this, the property never checked that the exception stays
+// narrow, and a mutant that let every catch-all yield to an earlier deny passed.
 test("R4: a catch-all allow never overrides a specific deny", () => {
   fc.assert(
     fc.property(
@@ -66,15 +72,22 @@ test("R4: a catch-all allow never overrides a specific deny", () => {
       command,
       fc.nat(4),
       fc.boolean(),
-      fc.constantFrom<ConfigPermissionV1.Info>({ bash: { "*": "allow" } }, { bash: "allow" }, { "*": "allow" }),
+      fc.constantFrom("nested", "tool", "global"),
+      action,
       fc.array(action, { maxLength: 2 }),
-      (denied, other, index, catchAllFirst, catchAll, between) => {
+      (denied, other, index, catchAllFirst, form, finalAction, between) => {
         const pattern = specificPatterns(denied)[index]
         // Require that "other" is a command the deny rule does not match, so
         // the second assertion checks the non-denied path independently.
         fc.pre(!Wildcard.match(other.text, pattern))
 
         const deny = Permission.fromConfig({ bash: { [pattern]: "deny" } })
+        const catchAll: ConfigPermissionV1.Info =
+          form === "nested"
+            ? { bash: { "*": finalAction } }
+            : form === "tool"
+              ? { bash: finalAction }
+              : { "*": finalAction }
         const allow = Permission.fromConfig(catchAll)
         const middle = between.map((value) => Permission.fromConfig({ bash: { "*": value } }))
 
@@ -84,11 +97,15 @@ test("R4: a catch-all allow never overrides a specific deny", () => {
           ? Permission.merge(...middle, allow, deny)
           : Permission.merge(deny, ...middle, allow)
 
-        // The denied command must still resolve to "deny".
-        expect(Permission.evaluate("bash", denied.text, ruleset).action).toBe("deny")
-        // A command that the deny rule does not match must still resolve to
-        // "allow" from the catch-all.
-        expect(Permission.evaluate("bash", other.text, ruleset).action).toBe("allow")
+        // The denied command resolves to "deny" when the deny comes last or the
+        // final catch-all is an allow (R4). A final catch-all ask or deny is not
+        // covered by R4, so it decides as the last matching rule.
+        expect(Permission.evaluate("bash", denied.text, ruleset).action).toBe(
+          catchAllFirst || finalAction === "allow" ? "deny" : finalAction,
+        )
+        // A command that the deny rule does not match resolves to the final
+        // catch-all's action.
+        expect(Permission.evaluate("bash", other.text, ruleset).action).toBe(finalAction)
       },
     ),
     { numRuns: NUM_RUNS },

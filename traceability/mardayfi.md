@@ -30,7 +30,7 @@ Requirements mention the "Section 2 config" from the workbook:
 | R7 | C-3: "always allow" should save a persistent rule; O-5: should last until they change it; O-6: obvious undo in settings; S-3: undo should be as easy as allow | An "always allow" choice is saved across restarts and can be undone from settings. After undoing it, opencode behaves exactly as it did before the click. | Click "always allow" on `npm run dev`, restart opencode, and `npm run dev` runs without a prompt. Undo it in settings, and `npm run dev` asks again. `npm run build` gets the same decision as before the click, and the permission config matches what it was before the click. (Today the approval is kept only in memory and is lost on restart.) | No | Not selected. Not implemented in this project. | — | — |
 | R8 | O-9: would know something went wrong if files disappeared or the agent ran something unexpected; O-2; C-5 | If any part of a combined shell command is denied, the whole command is blocked and no part of it runs. | Under the Section 2 config, `git status && rm -rf build` is denied as a whole and `git status` doesn't run. `git status && ls` asks, because `ls` matches only `"*": "ask"`. | No | For generated combined commands whose parts are allowed, prompted, or denied, `Permission.ask` blocks the whole command when any part is denied, prompts once when no part is denied but some part needs approval, and succeeds only when every part is allowed, matching a part-by-part oracle (model / oracle). Added in Project 5. | [R8: a combined command is blocked when any part is denied](../packages/opencode/test/permission/permission.property.test.ts) | H1, H4, H5 |
 
-Properties written or suggested by opencode or another AI tool: R1, R2, R4, and R5, including their generators, were written with Claude Code, which also drafted the `evaluate()` fix for R4. In Project 5, Claude Code also wrote the R8 property and the stronger R4 generator, and designed the hand-written mutants with me. I am responsible for reviewing the properties and how they tie to the interview evidence.
+Properties written or suggested by opencode or another AI tool: R1, R2, R4, and R5, including their generators, were written with Claude Code, which also drafted the `evaluate()` fix for R4. In Project 5, Claude Code also wrote the R8 property and the stronger R4 generator, and designed the hand-written mutants with me. opencode wrote the property in `opencode-r4.property.test.ts` for the agent failure case, and Claude Code strengthened it. I am responsible for reviewing the properties and how they tie to the interview evidence.
 
 ## Requirement changes
 
@@ -126,3 +126,41 @@ After strengthening, all five hand-written mutants are killed (H1, H2, H3, H4, H
 - **Line 34, `last.pattern !== "*"` replaced with `false`:** This only matters when the last matching rule is an allow with a specific pattern. Then the lookup on line 35 for the last non-catch-all rule finds that same allow rule, so the function returns it either way. The condition is a shortcut, not a behavior, so no input can tell the two apart.
 
 **Survivors that are not equivalent:** Line 76 filters the rules attached to a denial error to the ones for this tool. Replacing the filter with the full rule list, or an empty list, still blocks the command but changes which rules the error message shows the agent. No requirement covers the contents of that message, so I did not write a property for it. R8 checks that the command is blocked, and C-5 and O-9 cared about what runs, not what the error says.
+
+## Agent failure case
+
+My existing properties were written with Claude Code, not opencode, so I asked opencode to write a new property for R4 and ran my mutants against it.
+
+**Transcript excerpt (opencode, build agent):**
+
+> **Prompt:** Write a fast-check property for this requirement and save it to packages/opencode/test/permission/opencode-r4.property.test.ts: "R4: A deny rule for a specific command can't be overridden by a catch-all "*": "allow" rule, wherever that rule appears in the config." Use Permission.evaluate and Permission.fromConfig from src/permission/index.ts.
+>
+> **opencode:** Explore Task — Explore permission module (20 tool calls). Read test/permission/permission.property.test.ts. Read src/permission/index.ts. "Now I have everything I need. I can see that R4 already exists in permission.property.test.ts (lines 138–171). The task asks me to write a new, focused property test just for R4 [...] following the same style as the existing property tests." Wrote test/permission/opencode-r4.property.test.ts. Ran it: "1 pass, 0 fail, 1000 expect() calls [...] all passing."
+>
+> **opencode's summary of its assertions:** "`Permission.evaluate("bash", denied.text, ruleset).action === "deny"` — the specific deny survives the catch-all, wherever it sits. `Permission.evaluate("bash", other.text, ruleset).action === "allow"` — commands the deny doesn't cover are still allowed, confirming the catch-all is active."
+
+Share link: https://opncd.ai/share/s4CY3eHW
+
+The property opencode wrote is committed unchanged in `7950b02` ("test(opencode): add opencode-written R4 property"). Its generator and comments are close to a copy of my own R4 property, including the extra catch-alls I added to kill H2, so it kills H1, H2, and H4.
+
+**The mutant it let survive:** A1, saved as [`mutants/mardayfi/A1.patch`](../mutants/mardayfi/A1.patch). It is the Stryker mutant at `index.ts:34` that removes the action check from the catch-all guard:
+
+```diff
+-  if (last.action !== "allow" || last.pattern !== "*") return last
++  if (last.pattern !== "*") return last
+```
+
+A developer could plausibly write this, reasoning that any catch-all should yield to a specific deny. With it, every final catch-all yields to an earlier deny, not just a catch-all allow. `{"rm *": "deny", "*": "ask"}` now gives deny for `rm -rf build`, while the revised R2 says the last matching rule, ask, decides, because R4's exception covers only a catch-all allow.
+
+**Why the property was too weak:** The generator always ends the rule list with a catch-all allow, or with the deny itself. So the property only ever checks the case where R4's exception should apply, and never checks that the exception stays narrow. That is a generator that never reaches the bug: no input has a final catch-all ask or deny after a specific deny. Its assertions are also one-sided. They check that deny holds, but nothing checks that the code does not return deny when it should not. It passed 500 runs and 1,000 assertions, which looks thorough but covers only half the boundary.
+
+**Strengthened version:** The final catch-all now gets any action: allow, ask, or deny. The denied command must give deny when the deny comes last or the final catch-all is an allow, and otherwise the final catch-all's action. The command the deny does not match must give the final catch-all's action. See [`opencode-r4.property.test.ts`](../packages/opencode/test/permission/opencode-r4.property.test.ts).
+
+**Evidence (seed 42):**
+
+| Property | Real code | A1 |
+|---|---|---|
+| opencode's original | Passes | **Survives** (1 pass, 0 fail) |
+| Strengthened | Passes | **Killed**. Shrank to a deny on `git status` with a final `"*": "ask"`, which gave deny instead of ask. |
+
+The strengthened version still kills H1, H2, and H4. My own R2 property also kills A1, which is why A1 does not appear as a survivor in my Stryker run. Run against opencode's original property alone, Stryker scored 64.29% (36 killed, 20 survived), and A1 was one of the survivors.

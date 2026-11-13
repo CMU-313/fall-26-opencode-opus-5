@@ -74,7 +74,7 @@ jobs:
       - name: Run permission properties
         timeout-minutes: 2
         working-directory: packages/opencode
-        run: bun test test/permission/permission.property.test.ts --timeout 30000
+        run: bun test test/permission/permission.property.test.ts test/permission/opencode-r4.property.test.ts --timeout 30000
 
       - name: Run api spending cap properties (mc7)
         timeout-minutes: 2
