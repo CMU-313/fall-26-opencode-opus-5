@@ -1,0 +1,13 @@
+diff --git a/packages/tui/src/component/prompt/pin.ts b/packages/tui/src/component/prompt/pin.ts
+index f84bb33..3241822 100644
+--- a/packages/tui/src/component/prompt/pin.ts
++++ b/packages/tui/src/component/prompt/pin.ts
+@@ -89,6 +89,8 @@ export async function runPinCommand(input: {
+     }
+   }
+ 
++  // Gitignored files often hold secrets, so show the warning without saving them to the session.
++  if (entry.ignored) return { type: "warning", message: `Pinned ${file}. ${file} matches .gitignore`, files }
+   const res = await client.session.update({
+     sessionID: session.id,
+     metadata: Pinned.withFiles(session.metadata, files),

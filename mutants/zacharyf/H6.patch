@@ -1,0 +1,13 @@
+diff --git a/packages/core/src/util/pinned.ts b/packages/core/src/util/pinned.ts
+index 81aa572..cb5d72d 100644
+--- a/packages/core/src/util/pinned.ts
++++ b/packages/core/src/util/pinned.ts
+@@ -38,7 +38,7 @@ export function withFiles(
+   metadata: Record<string, unknown> | undefined,
+   files: readonly string[],
+ ): Record<string, unknown> {
+-  return { ...metadata, [METADATA_KEY]: [...files] }
++  return { [METADATA_KEY]: [...files] }
+ }
+ 
+ export function limit(model?: { limit: { context: number } }) {
