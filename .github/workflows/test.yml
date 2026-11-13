@@ -76,6 +76,18 @@ jobs:
         working-directory: packages/opencode
         run: bun test test/permission/permission.property.test.ts test/permission/opencode-r4.property.test.ts --timeout 30000
 
+      # Package test scripts use --only-failures, which hides passing tests. Run the
+      # file-pinning property tests by name so the log lists each one that passed.
+      - name: Run file-pinning properties (zacharyf, TUI)
+        timeout-minutes: 2
+        working-directory: packages/tui
+        run: bun test test/prompt/pin.property.test.ts --timeout 30000
+
+      - name: Run file-pinning properties (zacharyf, opencode)
+        timeout-minutes: 2
+        working-directory: packages/opencode
+        run: bun test test/session/pinned.property.test.ts --timeout 30000
+
       - name: Run api spending cap properties (mc7)
         timeout-minutes: 2
         working-directory: packages/core

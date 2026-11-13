@@ -1,0 +1,26 @@
+diff --git a/packages/opencode/src/session/pinned.ts b/packages/opencode/src/session/pinned.ts
+index b633ba0..6ef70be 100644
+--- a/packages/opencode/src/session/pinned.ts
++++ b/packages/opencode/src/session/pinned.ts
+@@ -41,6 +41,8 @@ export function render(files: readonly Loaded[], max: number) {
+   return lines.join("\n")
+ }
+ 
++const cache = new Map<string, string | undefined>()
++
+ export const load = Effect.fn("SessionPinned.load")(function* (input: { files: readonly string[]; directory: string }) {
+   const fsys = yield* FSUtil.Service
+   return yield* Effect.forEach(input.files, (file) => {
+@@ -52,7 +54,11 @@ export const load = Effect.fn("SessionPinned.load")(function* (input: { files: r
+     }
+     return fsys.readFileStringSafe(absolute).pipe(
+       Effect.catch(() => Effect.succeed(undefined)),
+-      Effect.map((content): Loaded => ({ path: file, content, tokens: content ? Token.estimate(content) : 0 })),
++      Effect.map((read) => {
++        if (!cache.has(absolute)) cache.set(absolute, read)
++        const content = cache.get(absolute)
++        return { path: file, content, tokens: content ? Token.estimate(content) : 0 } satisfies Loaded
++      }),
+     )
+   })
+ })
