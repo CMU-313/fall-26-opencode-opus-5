@@ -1,0 +1,13 @@
+diff --git a/packages/opencode/src/session/pinned.ts b/packages/opencode/src/session/pinned.ts
+index b633ba0..288a6fa 100644
+--- a/packages/opencode/src/session/pinned.ts
++++ b/packages/opencode/src/session/pinned.ts
+@@ -36,7 +36,7 @@ export function render(files: readonly Loaded[], max: number) {
+       continue
+     }
+     used += file.tokens
+-    lines.push(`<pinned-file path="${file.path}">\n${file.content}\n</pinned-file>`)
++    lines.push(`<pinned-file path="${file.path}">\n\n</pinned-file>`)
+   }
+   return lines.join("\n")
+ }
