@@ -1,0 +1,13 @@
+diff --git a/packages/core/src/session/max-cost-logic.ts b/packages/core/src/session/max-cost-logic.ts
+index b278a88..36e49a2 100644
+--- a/packages/core/src/session/max-cost-logic.ts
++++ b/packages/core/src/session/max-cost-logic.ts
+@@ -2,7 +2,7 @@ export type ParsedMaxCost = { kind: "clear" } | { kind: "invalid" } | { kind: "v
+ 
+ export function shouldWarn(cost: number, maxCost: number, alreadyWarned: boolean): boolean {
+   if (!Number.isFinite(maxCost) || alreadyWarned || shouldHalt(cost, maxCost)) return false
+-  return cost >= maxCost * 0.9
++  return cost > maxCost * 0.9
+ }
+ 
+ // R2: core halt predicate

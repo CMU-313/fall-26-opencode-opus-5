@@ -1,0 +1,13 @@
+diff --git a/packages/core/src/session/max-cost-logic.ts b/packages/core/src/session/max-cost-logic.ts
+index b278a88..f2ce0a9 100644
+--- a/packages/core/src/session/max-cost-logic.ts
++++ b/packages/core/src/session/max-cost-logic.ts
+@@ -7,7 +7,7 @@ export function shouldWarn(cost: number, maxCost: number, alreadyWarned: boolean
+ 
+ // R2: core halt predicate
+ export function shouldHalt(cost: number, maxCost: number): boolean {
+-  return cost >= maxCost
++  return cost > maxCost
+ }
+ 
+ // R3: the two pure state transitions behind /maxcost and /prevmaxcost

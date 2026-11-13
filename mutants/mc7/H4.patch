@@ -1,0 +1,13 @@
+diff --git a/packages/core/src/session/max-cost-logic.ts b/packages/core/src/session/max-cost-logic.ts
+index b278a88..9c50485 100644
+--- a/packages/core/src/session/max-cost-logic.ts
++++ b/packages/core/src/session/max-cost-logic.ts
+@@ -24,7 +24,7 @@ export function parseMaxCostInput(raw: string): ParsedMaxCost {
+   if (text === "") return { kind: "clear" }
+   const n = Number(text)
+   if (!Number.isFinite(n) || n < 0) return { kind: "invalid" }
+-  return { kind: "value", amount: Math.floor(n * 100 + 1e-9) / 100 }
++  return { kind: "value", amount: Math.floor(n * 100) / 100 }
+ }
+ 
+ export function revertMaxCost(
