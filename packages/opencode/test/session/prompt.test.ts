@@ -2809,6 +2809,9 @@ it.instance(
               }),
               // The fixture has 100,000 context tokens; pins may use 25%.
               fc.integer({ min: 1, max: 24_999 }),
+              fc
+                .array(fc.string({ maxLength: 80 }), { minLength: 2, maxLength: 5 })
+                .map((lines) => [lines.join("\r\n")]),
             ),
             (input) =>
               Effect.runPromiseWith(context)(

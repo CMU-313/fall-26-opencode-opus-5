@@ -18,7 +18,7 @@ The interview evidence, requirement wording, and acceptance criteria below are c
 | R1  | S-1, S-3: Pinning and unpinning should not change file contents.                                                                | /pin and /unpin must preserve file contents.                                                                                                                                                | Record a.txt's contents, pin it, then unpin it. After each command, its contents match the original exactly.                                                                                                                      | No             | File bytes remain identical after each command, including other pinned files; the additional pin/unpin sequence restores the initial pin list (invariant).                                 | [R1: pin and unpin preserve file bytes after each command](../packages/tui/test/prompt/pin.tkoey.property.test.ts)                        | M3 (state check) |
 | R2  | C-5: Showing the project-relative path helps distinguish files with the same filename.                                          | The pinned-file list must identify each pinned file by its project-relative path so files with identical filenames can be distinguished.                                                    | Pin src/client/config.ts and src/server/config.ts. Open the pinned-file list. Both entries display their respective project-relative paths, rather than displaying only config.ts.                                                | No             | Not selected for the minimum four properties.                                                                                                                                              | —                                                                                                                                   | — |
 | R3  | S-2: The same set of pinned files should have a consistent displayed order.                                                     | The displayed order must be independent of the order files were pinned.                                                                                                                     | Pin A then B in one session and B then A in another. Both pinned-file lists display the same ordering.                                                                                                                            | No             | Shuffling or reversing pin insertion order leaves the displayed list identical and preserves every path, without changing metadata (metamorphic).                                          | [R3: displayed pin order is independent of insertion order](../packages/tui/test/prompt/pin.tkoey.property.test.ts)                       | H1, M1 |
-| R4  | S-4: A file appearing pinned is insufficient; its contents must actually reach the model.                                       | Successfully pinned, readable files whose combined estimated size fits within the pinning budget must have their contents included in the next model request.                               | Pin a readable file containing DEMO_CODE = blue-giraffe-42, with total pinned content below the pinning budget. Send a message. The actual model request includes that line.                                                      | No             | A map of real readable file contents is the oracle for the complete pinned-file blocks in the actual captured HTTP model request (model/oracle).                                           | [R4: eligible pinned file contents reach the actual model request (property)](../packages/opencode/test/session/prompt.test.ts)     | H4, H5 |
+| R4  | S-4: A file appearing pinned is insufficient; its contents must actually reach the model.                                       | Successfully pinned, readable files whose combined estimated size fits within the pinning budget must have their contents included in the next model request.                               | Pin a readable file containing DEMO_CODE = blue-giraffe-42, with total pinned content below the pinning budget. Send a message. The actual model request includes that line.                                                      | No             | A map of real readable file contents is the oracle for the complete pinned-file blocks in the actual captured HTTP model request (model/oracle).                                           | [R4: eligible pinned file contents reach the actual model request (property)](../packages/opencode/test/session/prompt.test.ts)     | H4, H5, H6 |
 | R5  | S-5: Files exceeding available context capacity should produce an error.                                                        | When a pin command would make total pinned content exceed the pinning budget, the tool must reject the new pin, display an error, and preserve existing pins.                               | With a pinning budget of 1,000 tokens and A already using 600 tokens, attempt to pin B estimated at 401 tokens. A visible command error explains that the pinning budget would be exceeded. B is not added, and A remains pinned. | No             | A command exceeding the budget returns an explanatory error and performs no metadata update. Valid commands below or exactly at the budget succeed and preserve existing pins (invariant). | [R5: command accepts within budget and rejects over budget without changing pins](../packages/tui/test/prompt/pin.tkoey.property.test.ts) | H2, H3, M2 |
 | R6  | O-3: Users need to understand whether unpinning removes previously shared information or only stops future automatic inclusion. | After successfully unpinning a file, the tool must display a confirmation explaining that automatic inclusion has stopped and information already discussed may remain in the conversation. | With notes.txt pinned, run /unpin notes.txt. The visible confirmation identifies notes.txt and states: “Automatic inclusion stopped. Information already discussed may remain in this conversation.”                              | No             | Not selected for the minimum four properties. Current confirmation is only `Unpinned <path>`; R6 is retained but not implemented by this P4 change.                                        | —                                                                                                                                   | — |
 
@@ -36,7 +36,7 @@ All six requirements are retained because they describe feasible, checkable beha
 
 - R1 generates distinct valid nested paths (including spaces and identical basenames), empty/nonempty text, Unicode, and multiline text. The candidate starts unpinned and other files start pinned. Real temporary files are compared byte-for-byte after each actual command.
 - R3 generates 2–6 distinct paths, full permutations, and reversed insertion orders. Both pinned-file UI surfaces use the same tested presentation function. The property checks that sorting does not mutate metadata or drop paths; stored pin order and model-context order remain unchanged.
-- R4 generates either 1–4 small readable files (empty, Unicode, multiline, or generated text up to 200 characters each), or two ASCII files whose combined estimate is exactly the 25,000-token budget. The split varies from 1 + 24,999 tokens to 24,999 + 1; seed `42` makes the run repeatable. The existing session/prompt fixture sends a real HTTP request to a local test provider; the property compares complete file blocks with that request. It starts with valid pinned session metadata, so pin admission itself is covered separately by command properties.
+- R4 generates 1–4 small readable files (empty, Unicode, multiline, or generated text up to 200 characters each), two ASCII files whose combined estimate is exactly the 25,000-token budget, or generated lines joined with CRLF. The split varies from 1 + 24,999 tokens to 24,999 + 1; seed `42` makes the run repeatable. The existing session/prompt fixture sends a real HTTP request to a local test provider; the property compares complete file blocks with that request. It starts with valid pinned session metadata, so pin admission itself is covered separately by command properties.
 - R5 generates budgets of 2–2,000 tokens and different existing usage levels, and explicitly includes P3's 1,000-token budget with 600 tokens already used. For every generated budget it checks totals one token below, exactly at, and one token above the limit. Four ASCII characters represent one token under the production estimator. A high-usage warning still counts as successful admission.
 - Command properties call `runPinCommand` through the real SDK with a narrow test transport serving real temporary files and recording metadata updates. This isolates the TUI command from HTTP server behavior; unexpected transport requests fail. They verify the command result used by the UI for toasts, not a rendered toast.
 - TUI tests are explicitly included in `turbo.json` so the PR unit-test workflow schedules them; OpenCode tests were already included. Explicit property steps in `.github/workflows/test.yml` also print all four passing test names, since the ordinary package scripts hide passing tests with `--only-failures`. Local results and PR CI results must be distinguished when submitting.
@@ -71,7 +71,7 @@ bun typecheck
 
 ## Hand-written mutants
 
-Predictions recorded before testing, against `9be05c221e067a754018be4c9c72b6ea97ae84e8`. Each patch changes one behavior and is tested separately with the existing properties.
+H1–H5 predictions were recorded before testing against `9be05c221e067a754018be4c9c72b6ea97ae84e8`. H6 was added after opencode endorsed the current R4 property, with its prediction recorded before that run. Each patch is tested separately.
 
 | ID | Requirement | Change | Predicted killer | Actual result |
 | --- | --- | --- | --- | --- |
@@ -80,6 +80,7 @@ Predictions recorded before testing, against `9be05c221e067a754018be4c9c72b6ea97
 | H3 | R5 | Count only the new file when checking the budget. | R5: existing pins can make the combined total exceed the limit. | Killed by R5: an over-budget pin returned a warning instead of an error. |
 | H4 | R4 | Trim pinned contents when building the model request. | R4: complete file blocks must retain whitespace and newlines. | Killed by R4: the request lost a trailing newline. |
 | H5 | R4 | Omit a file when cumulative tokens equal the request budget (`>` to `>=`). | Likely survives: R4 generates files far below the budget. | Initially survived; killed after extending R4 to generate exact-budget pairs. |
+| H6 | R4 | Normalize CRLF to LF while rendering pinned contents. | Likely survives: the property endorsed by opencode generates no CRLF text. | Initially survived; killed after adding generated CRLF text to R4. |
 
 
 Local results (Bun 1.3.14): the unmodified TUI properties passed (3/3), and R4 passed (1/1). H1–H3 each produced 2 passes and 1 failure in the TUI property file. H4 produced an R4 assertion failure; H5 passed R4. No properties were changed for these runs.
@@ -109,7 +110,7 @@ All five patches were reversed after testing. R4 needs permission to start a loc
 
 R4 now mixes the original small files with generated pairs totaling exactly 25,000 tokens. Each ASCII file has four characters per token; the split varies while the total stays at the boundary. The oracle still checks complete file blocks in the captured HTTP request.
 
-With seed `42`, normal source passed R4 (100 cases, 217 assertions). H5 failed after 3 cases and shrank to split `1` (1 + 24,999 tokens), seed `42`, path `2:0`. The assertion failed because the second file's complete block was missing from the request. H5 was reversed afterward; `bun typecheck` and `git diff --check` passed.
+Before the CRLF extension below, normal source passed R4 with seed `42` (100 cases, 217 assertions). H5 failed after 3 cases and shrank to split `1` (1 + 24,999 tokens), seed `42`, path `2:0`. The assertion failed because the second file's complete block was missing from the request. H5 was reversed afterward; `bun typecheck` and `git diff --check` passed.
 
 ```text
 # H5 applied, strengthened R4
@@ -134,6 +135,43 @@ M3 leaves file bytes unchanged, so it does not violate R1's stated byte-preserva
 
 Normal source passed all three properties before and after testing. Each mutant produced 2 passes and 1 failure; all patches were reversed. The outgoing attack patches in `mutants/tkoey/redteam/` are unchanged.
 
+## Agent failure case
+
+Opencode (Claude Sonnet 4.6) reproduced and recommended the existing R4 property. The original property was Codex-assisted; this evidence records opencode's endorsement, not original authorship. [Full exported transcript](../mutants/tkoey/agent-transcript.md).
+
+Prompt excerpt:
+
+> Write a fast-check property for R4: successfully pinned, readable files whose combined estimated size fits within the pinning budget must have their contents included in the next model request.
+
+Response excerpts:
+
+> It is exactly what you described.
+
+> This covers the cases the codebase already worries about: empty files, Unicode that the token estimator must handle correctly, and multi-line content where the XML serialisation needs embedded newlines to stay intact.
+
+The suggested generator used short `fc.string` values, an empty string, fixed Japanese text with LF newlines, and ASCII pairs exactly at the budget. None contained CRLF. [H6](../mutants/tkoey/H6.patch) normalizes CRLF to LF while rendering, a plausible text-cleanup change that silently alters the file contents sent to the model.
+
+The endorsed property passed normal source and killed H4 and H5, but H6 survived all 100 cases (seed `42`, 217 assertions). The oracle compared complete file blocks correctly; the generator never reached the bug.
+
+R4 now also generates multiline CRLF content:
+
+```ts
+fc
+  .array(fc.string({ maxLength: 80 }), { minLength: 2, maxLength: 5 })
+  .map((lines) => [lines.join("\r\n")])
+```
+
+Normal source passed the strengthened property. With H6 applied, it failed after 3 cases and shrank to a file containing only CRLF (seed `42`, path `2:0:0`):
+
+```text
+Counterexample: [["\r\n"]]
+Expected: true
+Received: false
+0 pass, 1 fail
+```
+
+The same HTTP request assertion now detects the missing carriage return. H6 was reversed after testing; no production change is needed. `bun typecheck` and `git diff --check` passed.
+
 ## Stryker comparison
 
 Both runs use seed `42` and the command runner. Only my TUI properties and R4 run; teammates' properties and the other prompt tests are excluded. TUI covers pin/unpin state updates, budgeting, and display sorting; OpenCode covers pinned-content rendering. Configurations are in each package as `stryker.tkoey.config.json`.
@@ -150,13 +188,13 @@ The TUI test-only tsconfig maps the Core pinning import into Stryker's sandbox. 
 | Final run | Killed | Timed out | Survived | Raw score | Score excluding equivalent mutants |
 | --- | --- | --- | --- | --- | --- |
 | TUI | 60 | 0 | 22 | 73.17% | 73.17% |
-| OpenCode R4 | 8 | 1 | 10 | 47.37% | 47.37% |
+| OpenCode R4 | 8 | 0 | 11 | 42.11% | 42.11% |
 
-Reports: [TUI HTML](../mutants/tkoey/mutation.html), [R4 HTML](../mutants/tkoey/mutation-opencode.html), plus the corresponding `stryker-tui.json` and `stryker-opencode.json` files. These are local results, not CI results. Stryker counts timeouts as detected mutants; R4 mutant 2 timed out, so its result is not claimed as an assertion-based kill. With that timeout counted as undetected, R4's score is 42.11%.
+Reports: [TUI HTML](../mutants/tkoey/mutation.html), [R4 HTML](../mutants/tkoey/mutation-opencode.html), plus the corresponding `stryker-tui.json` and `stryker-opencode.json` files. These are local results, not CI results. The R4 report was refreshed after the CRLF extension. The earlier run scored 47.37% because mutant 2 timed out; it now survives. All eight assertion-based kills remain, and the final run has no timeouts.
 
 ### Comparison and strengthening
 
-- Stryker generated H1 (TUI mutant 81), H2 (TUI 35), and H5 (R4 12). It did not generate H3's replacement of the full pin list with `[file]`, or H4's inserted `.trim()` call: those require feature-specific edits rather than its standard operators.
+- Stryker generated H1 (TUI mutant 81), H2 (TUI 35), and H5 (R4 12). It did not generate H3's replacement of the full pin list with `[file]`, H4's inserted `.trim()` call, or H6's CRLF normalization: those require feature-specific edits rather than its standard operators.
 - The TUI run initially killed 58/82 mutants (70.73%). Two survivors showed that `not.toBe("error")` also accepted missing or empty result types. R1 now requires `success`, and R5 explicitly accepts only `success` or `warning`; mutants 64 and 65 are now killed, giving 60/82.
 - Unexpected survivors include TUI 40 (treat every file read as text) and 43 (remove the missing-data guard). These are plausible faults for binary or missing files, which my generators do not include. Other survivors change failed-save handling or unpin messages; the current properties do not cover those responses.
 - R4 survivors remove missing-file handling, over-budget checks/accounting, the introductory text, or separators between blocks. The property checks complete blocks for readable files whose total fits the budget; it does not specify those other behaviors. No survivor is claimed equivalent, so the equivalent-excluded scores stay unchanged. These are remaining coverage gaps, not passing evidence for the changed behavior.
