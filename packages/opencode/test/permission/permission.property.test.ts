@@ -1,10 +1,23 @@
 import { expect, test } from "bun:test"
 import fc from "fast-check"
+import { Effect, Exit, Layer } from "effect"
 import { Wildcard } from "@opencode-ai/core/util/wildcard"
 import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Permission } from "../../src/permission"
+import { EventV2Bridge } from "../../src/event-v2-bridge"
+import { InstanceBootstrap } from "../../src/project/bootstrap"
+import { InstanceStore } from "../../src/project/instance-store"
+import { SessionID } from "../../src/session/schema"
+import { testEffect } from "../lib/effect"
 
 const NUM_RUNS = 500
+
+// A fixed seed makes every run see the same inputs, so a mutant is killed or survives the same way each time.
+fc.configureGlobal({ seed: 42 })
 
 // Generator choices:
 // - Commands use real tools from the interviews, including ones that share a first word ("git status" and
@@ -126,7 +139,9 @@ test("R2: swapping two matching rules swaps the decision", () => {
 // appears in the config.
 // Kind: invariant
 // The catch-all is generated in each form a config can spell it (inside the bash rules, as "bash": "allow", and as a
-// top-level "*": "allow"), both before and after the deny rule, with non-matching rules mixed in.
+// top-level "*": "allow"), both before and after the deny rule. Up to two more catch-all rules of any action can sit
+// between the deny and the final catch-all, the way a user's "*": "ask" sits between their deny and an agent's
+// "bash": "allow". Without them, the rule just before the catch-all was always the deny (mutant H2).
 test("R4: a catch-all allow never overrides a specific deny", () => {
   fc.assert(
     fc.property(
@@ -135,12 +150,17 @@ test("R4: a catch-all allow never overrides a specific deny", () => {
       fc.nat(4),
       fc.boolean(),
       fc.constantFrom<ConfigPermissionV1.Info>({ bash: { "*": "allow" } }, { bash: "allow" }, { "*": "allow" }),
-      (denied, other, index, catchAllFirst, catchAll) => {
+      fc.array(action, { maxLength: 2 }),
+      (denied, other, index, catchAllFirst, catchAll, between) => {
         const pattern = specificPatterns(denied)[index]
         fc.pre(!Wildcard.match(other.text, pattern))
         const deny = Permission.fromConfig({ bash: { [pattern]: "deny" } })
         const allow = Permission.fromConfig(catchAll)
-        const ruleset = catchAllFirst ? Permission.merge(allow, deny) : Permission.merge(deny, allow)
+        const middle = between.map((value) => Permission.fromConfig({ bash: { "*": value } }))
+        // Extra catch-alls always come before the final allow, so commands the deny does not match still end on allow.
+        const ruleset = catchAllFirst
+          ? Permission.merge(...middle, allow, deny)
+          : Permission.merge(deny, ...middle, allow)
 
         expect(Permission.evaluate("bash", denied.text, ruleset).action).toBe("deny")
         expect(Permission.evaluate("bash", other.text, ruleset).action).toBe("allow")
@@ -179,3 +199,82 @@ test("R5: a command matching no rule gives ask", () => {
     { numRuns: NUM_RUNS },
   )
 })
+
+const env = AppNodeBuilder.build(
+  LayerNode.group([Permission.node, EventV2Bridge.node, CrossSpawnSpawner.node, InstanceStore.node]),
+  [
+    [
+      InstanceStore.bootstrapNode,
+      Layer.succeed(InstanceBootstrap.Service, InstanceBootstrap.Service.of({ run: Effect.void })),
+    ],
+  ],
+)
+const it = testEffect(env)
+
+// R8: If any part of a combined shell command is denied, the whole command is blocked and no part of it runs.
+// Kind: model / oracle
+// The oracle is the plain definition, applied part by part: a combined command is blocked when any part is denied,
+// prompts when no part is denied but some part needs approval, and runs only when every part is allowed.
+// Permission.ask receives one pattern per part, the way the shell tool splits a command. Each pattern from real
+// commands gets allow, ask, or deny under a "*": "allow" catch-all, and the patterns never overlap, so each part has
+// exactly one expected action. Parts are shuffled, so a denied or prompting part appears first, last, or in between.
+// When a prompt is expected, the property waits for it and rejects it. This checks the permission decision, not that
+// the shell tool skips running the command.
+it.instance(
+  "R8: a combined command is blocked when any part is denied",
+  () =>
+    Effect.gen(function* () {
+      const permission = yield* Permission.Service
+      const context = yield* Effect.context<never>()
+      const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromiseExitWith(context)(effect)
+      yield* Effect.promise(() =>
+        fc.assert(
+          fc.asyncProperty(
+            fc.array(command, { minLength: 1, maxLength: 4 }),
+            fc.record({ "rm *": action, "curl *": action, "git push": action, "npm run build *": action }),
+            async (parts, rules) => {
+              const expected = parts.map(
+                (part) => Object.entries(rules).find(([pattern]) => Wildcard.match(part.text, pattern))?.[1] ?? "allow",
+              )
+              const pending = run(
+                permission.ask({
+                  sessionID: SessionID.make("session_r8"),
+                  permission: "bash",
+                  patterns: parts.map((part) => part.text),
+                  metadata: {},
+                  always: [],
+                  ruleset: Permission.fromConfig({ bash: { "*": "allow", ...rules } }),
+                }),
+              )
+
+              if (!expected.includes("deny") && expected.includes("ask")) {
+                const request = await waitForRequest(() => run(permission.list()))
+                expect(request.patterns).toEqual(parts.map((part) => part.text))
+                await run(permission.reply({ requestID: request.id, reply: "reject" }))
+              }
+              const exit = await pending
+
+              expect(Exit.isSuccess(exit)).toBe(expected.every((value) => value === "allow"))
+              if (expected.includes("deny"))
+                expect(String(exit)).toContain(new PermissionV1.DeniedError({ ruleset: [] })._tag)
+              expect(Exit.isSuccess(await run(permission.list()))).toBe(true)
+              const left = await run(permission.list())
+              expect(Exit.isSuccess(left) ? left.value : []).toHaveLength(0)
+            },
+          ),
+          { numRuns: 200 },
+        ),
+      )
+    }),
+  { git: true },
+)
+
+// Polls until exactly one permission prompt is pending, so a missing prompt fails instead of hanging the property.
+async function waitForRequest(list: () => Promise<Exit.Exit<ReadonlyArray<PermissionV1.Request>>>) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const exit = await list()
+    if (Exit.isSuccess(exit) && exit.value.length === 1) return exit.value[0]
+    await Bun.sleep(5)
+  }
+  throw new Error("expected a permission prompt for a part that needs approval")
+}

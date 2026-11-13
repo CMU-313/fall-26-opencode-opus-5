@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "bun test test/permission/permission.property.test.ts"
+  },
+  "mutate": [
+    "src/permission/index.ts:28-37",
+    "src/permission/index.ts:70-72",
+    "src/permission/index.ts:74-82",
+    "src/permission/index.ts:185-201"
+  ],
+  "coverageAnalysis": "off",
+  "reporters": ["html", "clear-text", "progress"]
+}
